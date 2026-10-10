@@ -45,6 +45,18 @@ struct ExerciseProgress: Equatable {
     }
 }
 
+/// One finished workout, as shown in a template's history.
+struct WorkoutSession: Identifiable, Equatable {
+    let id: String
+    let templateID: String
+    let day: Day
+    /// Unknown for sessions logged in the app, which does not time workouts yet.
+    let minutes: Int?
+    let volume: Int
+    let sets: Int
+    let highlight: String
+}
+
 struct DayStatus: Equatable {
     var calories = false
     var workout = false

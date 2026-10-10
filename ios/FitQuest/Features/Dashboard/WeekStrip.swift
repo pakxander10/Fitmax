@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Seven days around a focus day. Drag sideways or tap a day to move the focus.
+/// Seven days around a focus day. Drag sideways or tap a date to move the focus;
+/// tap a tick box to jump to the page it tracks.
 struct WeekStrip: View {
     @Environment(AppModel.self) private var model
 
@@ -12,31 +13,29 @@ struct WeekStrip: View {
 
     var body: some View {
         let center = model.today.adding(offset)
-        VStack(spacing: 10) {
-            HStack {
-                Text("7-DAY PROGRESS").mono(color: Theme.ink)
-                Spacer()
+        VStack(spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("7-day progress").heading(18).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
                 if offset == 0 {
-                    Text("DRAG TO MOVE").mono()
+                    Text("Drag to move").caption()
                 } else {
-                    Button { offset = 0 } label: { Text("BACK TO TODAY").mono(color: Theme.ink) }
+                    Button { offset = 0 } label: { Text("Back to today").caption(13, color: Theme.link) }
                         .buttonStyle(PressStyle())
                 }
             }
             WeightedRow(weights: Self.weights) {
                 ForEach(-3...3, id: \.self) { delta in
                     cell(center.adding(delta), focused: delta == 0)
-                        .overlay(alignment: .trailing) {
-                            if delta < 3 { Theme.hairline.frame(width: 1) }
-                        }
+                        .padding(2)
                         .contentShape(Rectangle())
                         .onTapGesture { offset += delta }
                 }
             }
-            .overlay(Rectangle().strokeBorder(Theme.hairlineStrong, lineWidth: 1))
             .highPriorityGesture(drag)
             .sensoryFeedback(.selection, trigger: offset)
         }
+        .aeroCard(horizontal: 12)
     }
 
     private var drag: some Gesture {
@@ -52,42 +51,50 @@ struct WeekStrip: View {
 
     private func cell(_ day: Day, focused: Bool) -> some View {
         let status = model.status(for: day)
-        let onDone = Color.black
-        return VStack(alignment: focused ? .leading : .center, spacing: 4) {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return VStack(alignment: focused ? .leading : .center, spacing: 2) {
             Text(focused ? day.relativeLabel(to: model.today) : day.weekdayShort)
-                .mono(focused ? 11 : 9, tracking: focused ? 2 : 1, color: status.both ? onDone : focused ? Theme.ink : Theme.muted)
+                .caption(focused ? 11 : 10, color: focused || status.both ? Theme.ink : Theme.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(focused ? "\(day.weekdayShort) \(day.dayOfMonth) \(day.monthShort)" : day.dayOfMonth)
-                .display(focused ? 16 : 14, tracking: 1, color: status.both ? onDone : Theme.ink)
+                .heading(focused ? 15 : 14)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            VStack(alignment: .leading, spacing: 6) {
-                mark("CALORIES", on: status.calories, both: status.both, focused: focused)
-                mark("WORKOUT", on: status.workout, both: status.both, focused: focused)
+            VStack(alignment: .leading, spacing: 0) {
+                mark("Calories", page: .calorie, on: status.calories, day: day, focused: focused)
+                mark("Workout", page: .workout, on: status.workout, day: day, focused: focused)
             }
-            .padding(.top, 4)
         }
-        .padding(.top, 10)
-        .padding(.bottom, 12)
-        .padding(.horizontal, focused ? 12 : 2)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        .padding(.horizontal, focused ? 8 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: focused ? .topLeading : .top)
-        .background(status.both ? Theme.success : focused ? Theme.surfaceCard : .clear)
+        .background {
+            if status.both {
+                shape.fill(Theme.leafWash).overlay(shape.strokeBorder(.white, lineWidth: 1))
+            } else if focused {
+                shape.fill(.white).overlay(shape.strokeBorder(Theme.aqua.opacity(0.7), lineWidth: 1))
+            }
+        }
         .opacity(day > model.today && !focused ? 0.5 : 1)
         .animation(.easeOut(duration: 0.2), value: status)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(day.weekdayName) \(day.dayOfMonth). Calories \(status.calories ? "on target" : "not met"), workout \(status.workout ? "done" : "not done").")
     }
 
-    private func mark(_ label: String, on: Bool, both: Bool, focused: Bool) -> some View {
-        HStack(spacing: 6) {
-            Rectangle()
-                .fill(both ? .black : on ? Theme.success : .clear)
-                .overlay(Rectangle().strokeBorder(both ? .black : on ? Theme.success : Theme.hairlineStrong, lineWidth: 1))
-                .frame(width: 12, height: 12)
-            if focused {
-                Text(label).mono(9, tracking: 1.5, color: both ? .black : Theme.body)
+    /// One tick box. Tapping it opens the page that goal is tracked on.
+    private func mark(_ label: String, page: AppModel.Page, on: Bool, day: Day, focused: Bool) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.32)) { model.page = page }
+        } label: {
+            HStack(spacing: 5) {
+                FQCheck(on: on, size: 14)
+                if focused { Text(label).caption(10, color: Theme.body).lineLimit(1) }
             }
+            .frame(maxWidth: focused ? nil : .infinity, minHeight: 24, alignment: focused ? .leading : .center)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(PressStyle())
+        .accessibilityLabel("\(label), \(day.weekdayName) \(day.dayOfMonth): \(on ? "done" : "not done")")
+        .accessibilityHint("Opens the \(page.title) page")
     }
 }

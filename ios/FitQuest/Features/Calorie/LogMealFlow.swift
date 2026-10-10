@@ -21,7 +21,7 @@ struct LogMealFlow: View {
     }
 
     var body: some View {
-        FQOverlay(title: step == .review ? "Review estimate" : "Log a meal", onBack: { model.overlay = nil }) {
+        FQOverlay(title: step == .review ? "Review estimate" : "Log a meal", onBack: model.dismiss) {
             switch step {
             case .capture: capture
             case .analysing: analysing
@@ -33,99 +33,110 @@ struct LogMealFlow: View {
     // MARK: Steps
 
     private var capture: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            PhotoPlaceholder(label: "Camera viewfinder", ratio: 3.0 / 4.0, bordered: true)
+        VStack(alignment: .leading, spacing: 16) {
+            PhotoPlaceholder(label: "Camera viewfinder", ratio: 1, symbol: "camera")
             if let notice {
-                Text(notice).serif(14, color: Theme.warning)
+                Text(notice).copy(14, color: Theme.warning)
             }
             FlowLayout(spacing: 8) {
                 ForEach(MealSlot.allCases) { option in
+                    let selected = slot == option
                     Button { slot = option } label: {
                         Text(option.label)
-                            .mono(color: slot == option ? Theme.ink : Theme.muted)
+                            .caption(13, color: selected ? .white : Theme.link)
                             .padding(.horizontal, 14)
                             .frame(height: 36)
-                            .overlay(Capsule().strokeBorder(slot == option ? Theme.white : Theme.hairlineStrong, lineWidth: 1))
+                            .background { Glossy(shape: Capsule(), fill: selected ? Theme.blueGloss : Theme.pearlGloss) }
+                            .overlay(Capsule().strokeBorder(selected ? .clear : Theme.aqua.opacity(0.6), lineWidth: 1))
                             .contentShape(Capsule())
                     }
                     .buttonStyle(PressStyle())
-                    .accessibilityAddTraits(slot == option ? .isSelected : [])
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
             Button { analyse(.photo) } label: {
-                Circle()
-                    .strokeBorder(Theme.hairlineStrong, lineWidth: 1)
-                    .padding(6)
-                    .overlay(Circle().strokeBorder(Theme.white, lineWidth: 1))
+                Glossy(shape: Circle(), fill: Theme.greenGloss)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 3).padding(6))
                     .frame(width: 72, height: 72)
+                    .shadow(color: Theme.green.opacity(0.4), radius: 8, y: 4)
                     .contentShape(Circle())
             }
             .buttonStyle(PressStyle())
             .accessibilityLabel("Take photo")
             .frame(maxWidth: .infinity)
 
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Or type what you ate").mono()
-                    TextField("", text: $text, prompt: Text("2 eggs and toast").foregroundStyle(Theme.muted))
-                        .font(Theme.text(16))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Or type what you ate").caption(13)
+                HStack(spacing: 10) {
+                    TextField("", text: $text, prompt: Text("2 eggs and toast").foregroundStyle(Theme.muted.opacity(0.7)))
+                        .font(Theme.copy(16))
                         .foregroundStyle(Theme.ink)
-                        .tint(Theme.white)
+                        .tint(Theme.azure)
                         .textFieldStyle(.plain)
                         .submitLabel(.done)
                         .onSubmit(logText)
+                        .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .overlay(alignment: .bottom) { Hairline(color: Theme.hairlineStrong) }
+                        .background(Capsule().fill(.white))
+                        .overlay(Capsule().strokeBorder(Theme.aqua.opacity(0.6), lineWidth: 1))
+                    FQButton(title: "Log", compact: true, action: logText)
+                        .disabled(trimmedText.isEmpty)
                 }
-                FQButton(title: "Log", compact: true, action: logText)
-                    .disabled(trimmedText.isEmpty)
             }
         }
+        .aeroCard()
     }
 
     private var analysing: some View {
-        VStack(spacing: 16) {
-            Text("Estimating portions").mono(color: Theme.ink)
+        VStack(spacing: 14) {
+            Text("Estimating portions").heading(18)
             IndeterminateLine()
-            Text("Grams first, then nutrition").mono()
+            Text("Grams first, then nutrition").caption()
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 160)
+        .padding(.vertical, 40)
+        .aeroCard()
+        .padding(.top, 100)
     }
 
     private var review: some View {
         let total = items.map(\.macros).total
-        return VStack(alignment: .leading, spacing: 28) {
-            HStack(spacing: 24) {
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 16) {
                 FQRing(value: total.kcal, max: model.targets.kcal, size: 120)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(slot.label) · ESTIMATE").mono()
-                    Text("Adjust grams if a portion looks off. Calories and macros update with it.").serif(14)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(slot.label) · estimate").caption(13, color: Theme.ink)
+                    Text("Adjust grams if a portion looks off. Calories and macros update with it.").copy(14)
                 }
             }
+            .aeroCard()
+
             VStack(spacing: 0) {
                 ForEach($items) { $item in
-                    FQRow {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.name).serif(color: Theme.ink)
-                            Text("\(item.macros.kcal) KCAL · P \(item.macros.protein) · C \(item.macros.carbs) · F \(item.macros.fat) · \(item.confidence.label)")
-                                .mono()
+                    FQRow(divider: item.id != items.last?.id) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name).copy(color: Theme.ink)
+                            Text("\(item.macros.kcal) kcal · P \(item.macros.protein) · C \(item.macros.carbs) · F \(item.macros.fat) · \(item.confidence.label) confidence")
+                                .caption()
                         }
                         Spacer(minLength: 0)
                         HStack(spacing: 0) {
                             stepButton("minus", label: "Less \(item.name)") { item.adjust(by: -10) }
-                            Text("\(item.grams)G").mono(color: Theme.ink).frame(width: 48)
+                            Text("\(item.grams) g").heading(14).frame(width: 50)
                             stepButton("plus", label: "More \(item.name)") { item.adjust(by: 10) }
                         }
                     }
                 }
             }
+            .aeroCard(vertical: 4)
+
             HStack(spacing: 12) {
                 FQButton(title: "Save to log") {
                     model.saveMeal(slot: slot, items: items, source: source)
                 }
-                FQButton(title: "Retake", variant: .ghost) { step = .capture }
+                FQButton(title: "Retake", variant: .secondary) { step = .capture }
             }
+            .aeroCard()
         }
     }
 
@@ -158,11 +169,11 @@ struct LogMealFlow: View {
     private func stepButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .light))
-                .foregroundStyle(Theme.ink)
-                .frame(width: 32, height: 32)
-                .overlay(Circle().strokeBorder(Theme.hairlineStrong, lineWidth: 1))
-                .frame(width: 40, height: 44)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background { Glossy(shape: Circle(), fill: Theme.blueGloss) }
+                .frame(width: 38, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressStyle())
@@ -170,17 +181,18 @@ struct LogMealFlow: View {
     }
 }
 
-/// 1px line with a white segment sweeping across while an estimate is in flight.
+/// Glossy segment sweeping along a track while an estimate is in flight.
 private struct IndeterminateLine: View {
     @State private var sweeping = false
 
     var body: some View {
-        Theme.hairline
-            .frame(width: 160, height: 1)
+        Capsule()
+            .fill(Theme.ink.opacity(0.1))
+            .frame(width: 180, height: 8)
             .overlay(alignment: .leading) {
-                Theme.white.frame(width: 64, height: 1).offset(x: sweeping ? 160 : -64)
+                Glossy(shape: Capsule(), fill: Theme.blueGloss).frame(width: 64, height: 8).offset(x: sweeping ? 180 : -64)
             }
-            .clipped()
+            .clipShape(Capsule())
             .onAppear {
                 withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) { sweeping = true }
             }

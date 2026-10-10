@@ -14,16 +14,24 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Theme.canvas.ignoresSafeArea()
-            pager
-            NavBar()
-            overlay
+            AeroBackground()
+            Group {
+                pager
+                NavBar()
+            }
+            .accessibilityHidden(model.overlay != nil)
+            // Every open sheet stays mounted, so going back restores its search text and scroll position.
+            ForEach(Array(model.overlays.enumerated()), id: \.offset) { index, overlay in
+                sheet(for: overlay)
+                    .accessibilityHidden(index != model.overlays.count - 1)
+                    .transition(.opacity)
+            }
         }
         .overlay(alignment: .top) { toast }
-        .animation(.easeOut(duration: 0.2), value: model.overlay)
+        .animation(.easeOut(duration: 0.2), value: model.overlays)
         .animation(.easeOut(duration: 0.2), value: model.toast)
         .environment(model)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .onChange(of: model.page) { UserDefaults.standard.set(model.page.rawValue, forKey: Self.pageKey) }
         .onChange(of: scenePhase) {
@@ -63,16 +71,18 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private var overlay: some View {
-        switch model.overlay {
-        case .meal(let meal, let day): MealDetail(meal: meal, day: day).transition(.opacity)
-        case .logMeal: LogMealFlow().transition(.opacity)
-        case .profile: ProfileSheet().transition(.opacity)
-        case .pet: PetSheet().transition(.opacity)
-        case .friend(let friend): FriendProfile(friend: friend).transition(.opacity)
-        case .exercise(let id): ExerciseDetail(initialID: id).transition(.opacity)
-        case .aboutExercise(let exercise): AboutExerciseCard(exercise: exercise).transition(.opacity)
-        case nil: EmptyView()
+    private func sheet(for overlay: AppModel.Overlay) -> some View {
+        switch overlay {
+        case .meal(let meal, let day): MealDetail(meal: meal, day: day)
+        case .logMeal: LogMealFlow()
+        case .profile: ProfileSheet()
+        case .pet: PetSheet()
+        case .member(let member): MemberProfile(member: member)
+        case .addFriend: AddFriendSheet()
+        case .song(let song): SongListenersSheet(song: song)
+        case .template(let id): TemplateDetail(templateID: id)
+        case .exercise(let id): ExerciseDetail(initialID: id)
+        case .aboutExercise(let exercise): AboutExerciseCard(exercise: exercise)
         }
     }
 
@@ -80,13 +90,16 @@ struct RootView: View {
     private var toast: some View {
         if let message = model.toast {
             Text(message)
-                .mono(color: Theme.ink)
+                .heading(14)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .padding(.vertical, 10)
-                .padding(.horizontal, 16)
-                .background(Theme.surfaceElevated)
-                .overlay(Rectangle().strokeBorder(Theme.hairlineStrong, lineWidth: 1))
+                .padding(.horizontal, 18)
+                .background {
+                    Capsule().fill(.white)
+                        .overlay(Capsule().strokeBorder(Theme.aqua.opacity(0.6), lineWidth: 1))
+                        .shadow(color: Theme.azure.opacity(0.35), radius: 10, y: 5)
+                }
                 .padding(.top, 8)
                 .padding(.horizontal, 20)
                 .transition(.opacity)
@@ -107,11 +120,16 @@ struct NavBar: View {
                     Button {
                         withAnimation(.easeOut(duration: 0.32)) { model.page = page }
                     } label: {
-                        Circle()
-                            .strokeBorder(selected ? Theme.white : Theme.muted, lineWidth: 1)
-                            .frame(width: selected ? 20 : 8, height: selected ? 20 : 8)
-                            .frame(width: (selected ? 20 : 8) + 14, height: 44)
-                            .contentShape(Rectangle())
+                        Group {
+                            if selected {
+                                Glossy(shape: Circle(), fill: Theme.greenGloss)
+                            } else {
+                                Circle().fill(Theme.azure.opacity(0.3))
+                            }
+                        }
+                        .frame(width: selected ? 20 : 9, height: selected ? 20 : 9)
+                        .frame(width: (selected ? 20 : 9) + 14, height: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(PressStyle())
                     .accessibilityLabel(page.title)
@@ -119,18 +137,23 @@ struct NavBar: View {
                 }
             }
             .padding(.horizontal, 13)
-            .background(Capsule().fill(Theme.canvas))
-            .overlay(Capsule().strokeBorder(Theme.hairlineStrong, lineWidth: 1))
+            .background {
+                Capsule().fill(Theme.glass)
+                    .overlay(Capsule().strokeBorder(.white, lineWidth: 1))
+                    .shadow(color: Theme.azure.opacity(0.3), radius: 10, y: 5)
+            }
             .animation(.easeOut(duration: 0.2), value: model.page)
 
             if model.page == .calorie {
-                Button { model.overlay = .logMeal } label: {
-                    Image(systemName: "camera")
-                        .font(.system(size: 20, weight: .ultraLight))
-                        .foregroundStyle(Theme.ink)
+                Button { model.present(.logMeal) } label: {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(.white)
                         .frame(width: 60, height: 60)
-                        .background(Circle().fill(Theme.canvas))
-                        .overlay(Circle().strokeBorder(Theme.white, lineWidth: 1))
+                        .background {
+                            Glossy(shape: Circle(), fill: Theme.greenGloss)
+                                .shadow(color: Theme.green.opacity(0.45), radius: 8, y: 4)
+                        }
                 }
                 .buttonStyle(PressStyle())
                 .accessibilityLabel("Open camera to log a meal")
@@ -142,12 +165,21 @@ struct NavBar: View {
         .frame(height: 60)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .background(alignment: .bottom) {
-            LinearGradient(
-                stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.6), .init(color: .black.opacity(0), location: 1)],
-                startPoint: .bottom, endPoint: .top
-            )
-            .frame(height: 130)
+        .background {
+            // The flexible container is what reaches under the home indicator; a fixed-height
+            // gradient on its own stops at the safe area and lets page content show beneath it.
+            ZStack(alignment: .bottom) {
+                Color.clear
+                LinearGradient(
+                    stops: [
+                        .init(color: Theme.meadow, location: 0),
+                        .init(color: Theme.meadow.opacity(0.9), location: 0.45),
+                        .init(color: Theme.meadow.opacity(0), location: 1),
+                    ],
+                    startPoint: .bottom, endPoint: .top
+                )
+                .frame(height: 160)
+            }
             .ignoresSafeArea(edges: .bottom)
             .allowsHitTesting(false)
         }

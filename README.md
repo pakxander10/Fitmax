@@ -13,12 +13,11 @@ The app currently runs entirely on sample data — no backend, camera or persist
 ios/
   FitQuest/            app sources (the Xcode target syncs this folder; new files need no project edit)
     App/               entry point, root pager, AppModel (all UI state)
-    Core/Design/       colour and type tokens, shared components
-    Core/Logic/        rank, calorie and date maths (pure, unit-tested)
+    Core/Design/       Frutiger Aero theme: sky background, glass cards, glossy controls
+    Core/Logic/        pet level, mood, calorie and date maths (pure, unit-tested)
     Core/Models/       food, workout and social types
     Core/Data/         sample data from the design prototype
     Features/          Calorie, Dashboard, Workout, Gym
-    Resources/Fonts/   Saira Condensed, EB Garamond, JetBrains Mono (OFL)
   FitQuestTests/       unit tests
   Package.swift        builds the same sources for macOS so tests run without a simulator
 ```

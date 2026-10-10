@@ -2,21 +2,24 @@ import SwiftUI
 
 struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.opacity(configuration.isPressed ? 0.55 : 1)
+        configuration.label
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
 struct Hairline: View {
-    var color = Theme.hairline
+    var color = Theme.divider
 
     var body: some View {
         color.frame(height: 1)
     }
 }
 
-/// Transparent pill with a 1px white outline. Never filled.
+/// Glossy pill. Primary is green for the one main action; secondary is pearl.
 struct FQButton: View {
-    enum Variant { case primary, ghost }
+    enum Variant { case primary, secondary }
 
     let title: String
     var variant = Variant.primary
@@ -28,19 +31,24 @@ struct FQButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .mono(14, tracking: 2.5, color: Theme.ink)
+                .heading(16, color: variant == .primary ? .white : Theme.link)
+                .shadow(color: variant == .primary ? Theme.green.opacity(0.7) : .clear, radius: 1, y: 1)
                 .lineLimit(1)
-                .padding(.horizontal, compact ? 20 : 32)
+                .padding(.horizontal, compact ? 18 : 26)
                 .frame(height: 44)
-                .overlay(Capsule().strokeBorder(variant == .primary ? Theme.white : .clear, lineWidth: 1))
+                .background {
+                    Glossy(shape: Capsule(), fill: variant == .primary ? Theme.greenGloss : Theme.pearlGloss)
+                        .overlay(Capsule().strokeBorder(variant == .primary ? .clear : Theme.aqua.opacity(0.6), lineWidth: 1))
+                        .shadow(color: Theme.azure.opacity(0.28), radius: 6, y: 3)
+                }
                 .contentShape(Capsule())
         }
         .buttonStyle(PressStyle())
-        .opacity(isEnabled ? 1 : 0.4)
+        .opacity(isEnabled ? 1 : 0.45)
     }
 }
 
-/// Circular 40pt outline button holding one SF Symbol.
+/// Glossy blue orb holding one SF Symbol.
 struct FQIconButton: View {
     let label: String
     let symbol: String
@@ -58,46 +66,58 @@ struct FQIconGlyph: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 14, weight: .light))
-            .foregroundStyle(Theme.ink)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
             .frame(width: 40, height: 40)
-            .overlay(Circle().strokeBorder(Theme.white, lineWidth: 1))
+            .background {
+                Glossy(shape: Circle(), fill: Theme.blueGloss)
+                    .shadow(color: Theme.azure.opacity(0.35), radius: 5, y: 3)
+            }
             .frame(width: 44, height: 44)
             .contentShape(Rectangle())
     }
 }
 
-/// A figure over its mono unit label, with a hairline above.
+/// A figure over its label, in a pale inset tile.
 struct SpecCell: View {
     let value: String
     let label: String
-    var padding: CGFloat = 14
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(value).display().lineLimit(1).minimumScaleFactor(0.5)
-            Text(label).mono().lineLimit(1).minimumScaleFactor(0.7)
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).heading(22).lineLimit(1).minimumScaleFactor(0.5)
+            Text(label).caption().lineLimit(1).minimumScaleFactor(0.7)
         }
-        .padding(.vertical, padding)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) { Hairline() }
+        .background(shape.fill(Theme.well.opacity(0.8)))
+        .overlay(shape.strokeBorder(.white, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Square-cornered stand-in for imagery that has not been supplied yet.
+/// Stand-in for imagery that has not been supplied yet.
 struct PhotoPlaceholder: View {
     let label: String
     var ratio: CGFloat = 16.0 / 9.0
-    var bordered = false
+    var symbol = "photo"
 
     var body: some View {
-        Rectangle()
-            .fill(Theme.surfaceSoft)
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        shape
+            .fill(LinearGradient(colors: [Color(hex: 0xCDEFFF), Color(hex: 0x8FD6F8)], startPoint: .top, endPoint: .bottom))
             .aspectRatio(ratio, contentMode: .fit)
-            .overlay { Text(label).mono(color: Theme.mutedSoft) }
-            .overlay { if bordered { Rectangle().strokeBorder(Theme.hairline, lineWidth: 1) } }
+            .overlay {
+                VStack(spacing: 8) {
+                    Image(systemName: symbol).font(.system(size: 28, weight: .light)).foregroundStyle(.white)
+                    Text(label).caption(color: Theme.ink.opacity(0.7))
+                }
+            }
+            .overlay(shape.strokeBorder(.white, lineWidth: 1))
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(label)
     }
 }
@@ -111,19 +131,23 @@ struct FQRing: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Theme.hairline, lineWidth: 6)
+            Circle().stroke(Theme.ink.opacity(0.1), lineWidth: 12)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(Theme.white, lineWidth: 6)
+                .stroke(
+                    LinearGradient(colors: [Theme.aqua, Theme.lime], startPoint: .top, endPoint: .bottom),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
+                .shadow(color: Theme.aqua.opacity(0.5), radius: 4)
                 .animation(.easeInOut(duration: 0.6), value: fraction)
-            VStack(spacing: 2) {
-                // String() keeps the figure free of locale grouping, matching the design.
-                Text(String(value)).display(30, tracking: 1).contentTransition(.numericText())
-                Text("/ \(String(max)) KCAL").mono()
+            VStack(spacing: 0) {
+                // String() keeps the figure free of locale grouping.
+                Text(String(value)).heading(size * 0.2).contentTransition(.numericText())
+                Text("of \(String(max)) kcal").caption()
             }
         }
-        .frame(width: size - 14, height: size - 14)
+        .frame(width: size - 12, height: size - 12)
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(value) of \(max) kilocalories, estimate")
@@ -134,16 +158,16 @@ struct FQBar: View {
     let label: String
     let value: Int
     let max: Int
-    var unit = "G"
+    var unit = "g"
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             HStack {
-                Text(label).mono(color: Theme.ink)
+                Text(label).caption(13, color: Theme.ink)
                 Spacer(minLength: 4)
-                Text("\(value) / \(max) \(unit)").mono().lineLimit(1).minimumScaleFactor(0.7)
+                Text("\(value) / \(max) \(unit)").caption().lineLimit(1).minimumScaleFactor(0.7)
             }
-            FQProgressLine(fraction: Double(value) / Double(Swift.max(1, max)))
+            FQProgressLine(fraction: Double(value) / Double(Swift.max(1, max)), fill: Theme.blueGloss)
         }
         .accessibilityElement(children: .combine)
     }
@@ -151,23 +175,26 @@ struct FQBar: View {
 
 struct FQProgressLine: View {
     let fraction: Double
+    var fill = Theme.greenGloss
 
     var body: some View {
-        Theme.hairline
-            .frame(height: 2)
+        Capsule()
+            .fill(Theme.ink.opacity(0.1))
+            .frame(height: 8)
             .overlay(alignment: .leading) {
                 GeometryReader { geo in
-                    Theme.white.frame(width: geo.size.width * Swift.max(0, Swift.min(1, fraction)))
+                    Glossy(shape: Capsule(), fill: fill)
+                        .frame(width: Swift.max(8, geo.size.width * Swift.max(0, Swift.min(1, fraction))))
                 }
             }
             .animation(.easeInOut(duration: 0.6), value: fraction)
     }
 }
 
-/// Square tick box that fills green when on. Pass no action for a read-only mark.
+/// Rounded tick box that turns glossy green when on. Pass no action for a read-only mark.
 struct FQCheck: View {
     let on: Bool
-    var size: CGFloat = 22
+    var size: CGFloat = 24
     var label = ""
     var action: (() -> Void)?
 
@@ -183,62 +210,84 @@ struct FQCheck: View {
     }
 
     private var box: some View {
-        Rectangle()
-            .fill(on ? Theme.success : .clear)
-            .overlay(Rectangle().strokeBorder(on ? Theme.success : Theme.hairlineStrong, lineWidth: 1))
-            .overlay {
-                if on {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: size * 0.5, weight: .regular))
-                        .foregroundStyle(.black)
-                }
+        let shape = RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+        return ZStack {
+            if on {
+                Glossy(shape: shape, fill: Theme.greenGloss)
+                Image(systemName: "checkmark")
+                    .font(.system(size: size * 0.5, weight: .bold))
+                    .foregroundStyle(.white)
+            } else {
+                shape.fill(.white).overlay(shape.strokeBorder(Theme.ink.opacity(0.28), lineWidth: 1))
             }
-            .frame(width: size, height: size)
-            .animation(.easeOut(duration: 0.18), value: on)
+        }
+        .frame(width: size, height: size)
+        .animation(.easeOut(duration: 0.18), value: on)
     }
 }
 
+/// Glossy orb with initials. `active` adds a green ring.
 struct FQAvatar: View {
     let initials: String
     var size: CGFloat = 48
-    var fill = Theme.surfaceCard
-    var border = Theme.hairlineStrong
-    var borderWidth: CGFloat = 1
+    var active = false
 
     var body: some View {
-        Circle()
-            .fill(fill)
-            .overlay(Circle().strokeBorder(border, lineWidth: borderWidth))
-            .overlay { Text(initials).mono(Swift.max(8, size * 0.26), tracking: 1, color: Theme.ink) }
+        Glossy(shape: Circle(), fill: Theme.blueGloss)
+            .overlay {
+                Text(initials)
+                    .heading(Swift.max(7, size * 0.32), color: .white)
+                    .shadow(color: Theme.azure.opacity(0.6), radius: 1, y: 1)
+            }
+            .padding(active ? 3 : 0)
+            .overlay { if active { Circle().strokeBorder(Theme.lime, lineWidth: 3) } }
             .frame(width: size, height: size)
+            .shadow(color: Theme.azure.opacity(0.25), radius: size * 0.08, y: size * 0.05)
     }
 }
 
-/// List row: 56pt minimum, hairline underneath.
+/// List row: 56pt minimum, with a divider underneath unless it is the last in its card.
 struct FQRow<Content: View>: View {
     var alignment = VerticalAlignment.center
+    var divider = true
     @ViewBuilder var content: Content
 
     var body: some View {
         HStack(alignment: alignment, spacing: 12) { content }
             // Take the wrapped height before the minimum-height frame can squeeze text to one line.
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-            .overlay(alignment: .bottom) { Hairline() }
+            .overlay(alignment: .bottom) { if divider { Hairline() } }
     }
 }
 
+/// Page title block. Sits directly on the top of the sky, so it is white.
 struct FQHead: View {
     var index: String?
     let title: String
     var meta: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let index { Text(index).mono() }
-            Text(title).display().accessibilityAddTraits(.isHeader)
-            if let meta { Text(meta).serif(14, color: Theme.muted) }
+        VStack(alignment: .leading, spacing: 4) {
+            if let index { Text(index).caption(13, color: Theme.onSky.opacity(0.9)) }
+            Text(title).heading(color: Theme.onSky).accessibilityAddTraits(.isHeader)
+            if let meta { Text(meta).copy(15, color: Theme.onSky.opacity(0.95)) }
+        }
+        .skyShadow()
+    }
+}
+
+/// Title row at the top of a card.
+struct CardTitle: View {
+    let title: String
+    var trailing: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).heading(18).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            if let trailing { Text(trailing).caption() }
         }
     }
 }
@@ -264,7 +313,7 @@ struct PageScroll<Content: View>: View {
     }
 }
 
-/// Full-screen sheet with a back button and a centred mono title.
+/// Full-screen sheet with a back button and a centred title.
 struct FQOverlay<Content: View>: View {
     let title: String
     let onBack: () -> Void
@@ -275,13 +324,18 @@ struct FQOverlay<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                FQIconButton(label: "Back", symbol: "arrow.left", action: onBack)
-                Text(title).mono(color: Theme.ink).frame(maxWidth: .infinity)
+                FQIconButton(label: "Back", symbol: "chevron.left", action: onBack)
+                Text(title)
+                    .heading(18, color: Theme.onSky)
+                    .skyShadow()
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityAddTraits(.isHeader)
                 Color.clear.frame(width: 44, height: 44)
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
 
             if flat {
                 padded
@@ -292,26 +346,26 @@ struct FQOverlay<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: flat ? nil : .infinity, alignment: .top)
-        .background(Theme.canvas.ignoresSafeArea())
+        .background { AeroBackground() }
     }
 
     private var padded: some View {
         content
             .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 48)
+            .padding(.top, 8)
+            .padding(.bottom, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-/// Dimmed backdrop holding one centred card. Tapping the backdrop closes it.
+/// Dimmed backdrop holding one centred glass card. Tapping the backdrop closes it.
 struct FQScrim<Content: View>: View {
     let onClose: () -> Void
     @ViewBuilder var content: Content
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.82)
+            Theme.ink.opacity(0.55)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onClose)
                 .accessibilityLabel("Close")
@@ -319,7 +373,7 @@ struct FQScrim<Content: View>: View {
             content
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.surfaceCard)
+                .background { GlassPanel(radius: 24) }
                 .padding(20)
         }
     }

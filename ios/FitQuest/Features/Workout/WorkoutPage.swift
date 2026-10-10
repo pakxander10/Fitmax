@@ -8,17 +8,19 @@ struct WorkoutPage: View {
     @FocusState private var renameFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            FQHead(index: "03 · WORKOUT", title: "My templates", meta: "Saved workouts. Tap one to make it today’s session.")
+        VStack(alignment: .leading, spacing: 16) {
+            FQHead(index: "Workout", title: "My templates", meta: "Saved workouts. Tap one to see it and your past sessions.")
             VStack(spacing: 0) {
                 ForEach(Array(model.templates.enumerated()), id: \.element.id) { index, template in
                     templateRow(template, index: index)
                 }
             }
+            .aeroCard(vertical: 4)
+
             if let active = model.activeTemplate {
-                session(active).padding(.top, 16)
+                session(active)
             } else {
-                Text("No templates left. Generate a new plan from your profile.").serif().padding(.top, 16)
+                Text("No templates left. Generate a new plan from your profile.").copy().aeroCard()
             }
         }
     }
@@ -26,33 +28,42 @@ struct WorkoutPage: View {
     // MARK: Templates
 
     private func templateRow(_ template: WorkoutTemplate, index: Int) -> some View {
-        FQRow {
-            Text(String(format: "%02d", index + 1)).mono().frame(width: 24, alignment: .leading)
+        let isToday = template.id == model.activeTemplate?.id
+        return FQRow(divider: template.id != model.templates.last?.id) {
+            Text(String(format: "%02d", index + 1)).caption(13).frame(width: 22, alignment: .leading)
             if renamingID == template.id {
                 TextField("", text: $draftName)
-                    .font(Theme.display(16))
-                    .tracking(1.5)
+                    .font(Theme.heading(16))
                     .foregroundStyle(Theme.ink)
-                    .tint(Theme.white)
+                    .tint(Theme.azure)
                     .textFieldStyle(.plain)
                     .submitLabel(.done)
                     .focused($renameFocused)
                     .onSubmit(commitRename)
                     .onChange(of: renameFocused) { if !renameFocused { commitRename() } }
+                    .padding(.horizontal, 12)
                     .frame(height: 40)
-                    .overlay(alignment: .bottom) { Hairline(color: Theme.white) }
+                    .background(Capsule().fill(.white))
+                    .overlay(Capsule().strokeBorder(Theme.aqua, lineWidth: 1))
             } else {
-                Button { model.activeTemplateID = template.id } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(template.name).display(16, tracking: 1.5)
-                        Text("\(template.exercises.count) EXERCISES\(template.id == model.activeTemplate?.id ? " · TODAY" : "")").mono()
+                Button { model.present(.template(template.id)) } label: {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(template.name).heading(16)
+                            Text("\(template.exercises.count) exercises\(isToday ? " · today" : "")").caption()
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
+                .accessibilityHint("Opens the workout and its past sessions")
             }
             MoreMenu(label: "More for \(template.name)") {
+                if !isToday {
+                    Button("Make today’s workout") { model.activeTemplateID = template.id }
+                }
                 Button("Rename") { beginRename(template) }
                 Button("Remove template", role: .destructive) { model.removeTemplate(template.id) }
             }
@@ -75,53 +86,65 @@ struct WorkoutPage: View {
 
     private func session(_ active: WorkoutTemplate) -> some View {
         let done = model.doneCount
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Today’s recommended workout").display(20, tracking: 1).accessibilityAddTraits(.isHeader)
-            Text("\(active.name) · \(done)/\(active.exercises.count) DONE · ~55 MIN").mono()
+        return VStack(alignment: .leading, spacing: 8) {
+            CardTitle(title: "Today’s recommended workout")
+            Text("\(active.name) · \(done)/\(active.exercises.count) done · about 55 min").caption(13)
             Text("Bench load is up 5 lb from last week: all sets hit 8 reps at RIR 2. Overhead press stays swapped out for your left shoulder.")
-                .serif(14, color: Theme.muted)
+                .copy(14)
             VStack(spacing: 0) {
-                ForEach(active.exercises) { exerciseRow($0) }
-            }
-            FQButton(title: done == 0 ? "Start workout" : done == active.exercises.count ? "Review workout" : "Continue workout") {
-                let next = active.exercises.first { !model.isDone($0) } ?? active.exercises.first
-                if let next { model.overlay = .exercise(next.id) }
-            }
-            .disabled(active.exercises.isEmpty)
-            .padding(.top, 12)
-        }
-    }
-
-    private func exerciseRow(_ exercise: Exercise) -> some View {
-        let done = model.isDone(exercise)
-        return FQRow {
-            Circle()
-                .fill(Theme.surfaceSoft)
-                .overlay(Circle().strokeBorder(done ? Theme.success : Theme.hairlineStrong, lineWidth: 1))
-                .overlay {
-                    if done {
-                        Image(systemName: "checkmark").font(.system(size: 13, weight: .light)).foregroundStyle(Theme.success)
-                    } else {
-                        Text(exercise.group.prefix(3)).mono(9, tracking: 1)
+                ForEach(active.exercises) { exercise in
+                    ExerciseRow(exercise: exercise, templateID: active.id, divider: exercise.id != active.exercises.last?.id) {
+                        MoreMenu(label: "More for \(exercise.name)") {
+                            Button("About exercise") { model.present(.aboutExercise(exercise)) }
+                            Button("Replace exercise") { model.replaceExercise(exercise) }
+                            Button("Remove exercise", role: .destructive) { model.removeExercise(exercise) }
+                        }
                     }
                 }
-                .frame(width: 44, height: 44)
+            }
+            FQButton(title: done == 0 ? "Start workout" : done == active.exercises.count ? "Review workout" : "Continue workout") {
+                model.startWorkout(active.id)
+            }
+            .disabled(active.exercises.isEmpty)
+            .padding(.top, 8)
+        }
+        .aeroCard()
+    }
+}
+
+/// One exercise of a template: muscle-group orb, name and prescription. Tapping it starts the workout there.
+struct ExerciseRow<Trailing: View>: View {
+    let exercise: Exercise
+    let templateID: String
+    var divider = true
+    @ViewBuilder var trailing: Trailing
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let done = model.isDone(exercise)
+        FQRow(divider: divider) {
+            Glossy(shape: Circle(), fill: done ? Theme.greenGloss : Theme.blueGloss)
+                .overlay {
+                    if done {
+                        Image(systemName: "checkmark").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                    } else {
+                        Text(exercise.group.prefix(3).capitalized).heading(11, color: .white)
+                    }
+                }
+                .frame(width: 42, height: 42)
                 .accessibilityHidden(true)
-            Button { model.overlay = .exercise(exercise.id) } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(exercise.name).serif(color: done ? Theme.muted : Theme.ink).multilineTextAlignment(.leading)
-                    Text("\(exercise.prescription) · \(exercise.restSeconds)S REST").mono()
+            Button { model.startWorkout(templateID, at: exercise.id) } label: {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(exercise.name).copy(color: done ? Theme.muted : Theme.ink).multilineTextAlignment(.leading)
+                    Text("\(exercise.prescription) · \(exercise.restSeconds)s rest").caption()
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(PressStyle())
             .accessibilityValue(done ? "Done" : "")
-            MoreMenu(label: "More for \(exercise.name)") {
-                Button("About exercise") { model.overlay = .aboutExercise(exercise) }
-                Button("Replace exercise") { model.replaceExercise(exercise) }
-                Button("Remove exercise", role: .destructive) { model.removeExercise(exercise) }
-            }
+            trailing
         }
     }
 }
@@ -135,7 +158,11 @@ private struct MoreMenu<Items: View>: View {
         Menu {
             items
         } label: {
-            Text("···").mono(16, tracking: 1).frame(width: 44, height: 44).contentShape(Rectangle())
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 40, height: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityLabel(label)
     }
@@ -146,15 +173,15 @@ struct AboutExerciseCard: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        FQScrim(onClose: { model.overlay = nil }) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(exercise.group).mono()
-                Text(exercise.name).display(20, tracking: 1)
-                Text(exercise.about).serif()
-                Text("SUBSTITUTE · \(exercise.alternative)").mono()
-                FQButton(title: "Close") { model.overlay = nil }
+        FQScrim(onClose: model.dismiss) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(exercise.group.capitalized).caption(13)
+                Text(exercise.name).heading(20)
+                Text(exercise.about).copy()
+                Text("Substitute · \(exercise.alternative)").caption(13)
+                FQButton(title: "Close", variant: .secondary, action: model.dismiss).padding(.top, 4)
             }
-            .padding(24)
+            .padding(20)
         }
     }
 }

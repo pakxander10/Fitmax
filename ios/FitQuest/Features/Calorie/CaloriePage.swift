@@ -4,48 +4,51 @@ struct CaloriePage: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 40) {
+        let recommendations = SampleData.recommendations
+        VStack(alignment: .leading, spacing: 16) {
             FQHead(
-                index: "01 · CALORIE",
+                index: "Calorie",
                 title: "Recommended meals",
                 meta: "Fits your remaining \(max(0, model.remainingKcal)) kcal. Peanut-free, per your profile."
             )
             VStack(spacing: 0) {
-                ForEach(SampleData.recommendations) { RecommendationRow(recommendation: $0) }
+                ForEach(recommendations) { recommendation in
+                    RecommendationRow(recommendation: recommendation, divider: recommendation.id != recommendations.last?.id)
+                }
             }
-            VStack(alignment: .leading, spacing: 24) {
-                Text("Previous logs").display(20, tracking: 1).accessibilityAddTraits(.isHeader)
-                ForEach(model.loggedDays, id: \.self) { DayLog(day: $0) }
-            }
+            .aeroCard(vertical: 4)
+
+            ForEach(model.loggedDays, id: \.self) { DayLog(day: $0) }
         }
     }
 }
 
 private struct RecommendationRow: View {
     let recommendation: MealRecommendation
+    let divider: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(recommendation.name).display(18, tracking: 1)
+                Text(recommendation.name).heading(16)
                 Spacer(minLength: 0)
-                Text("\(recommendation.kcal) KCAL").mono().fixedSize()
+                Text("\(recommendation.kcal) kcal").caption(13, color: Theme.ink).fixedSize()
             }
-            FlowLayout(spacing: 16) {
+            FlowLayout(spacing: 14, lineSpacing: 4) {
                 if let recipe = Self.searchURL("\(recommendation.name) recipe") {
-                    Link(destination: recipe) { Text("Recipe →").mono(color: Theme.link) }
+                    Link(destination: recipe) { Text("Recipe ›").caption(13, color: Theme.link) }
                 }
                 if let map = Self.mapURL(recommendation.name) {
                     Link(destination: map) {
-                        Text("\(recommendation.place) · \(recommendation.distance) →").mono(color: Theme.link)
+                        Text("\(recommendation.place) · \(recommendation.distance) ›").caption(13, color: Theme.link)
                     }
                 }
-                Text("\(recommendation.protein) G PROTEIN").mono()
+                Text("\(recommendation.protein) g protein").caption(13)
             }
         }
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .bottom) { Hairline() }
+        .overlay(alignment: .bottom) { if divider { Hairline() } }
     }
 
     private static func searchURL(_ query: String) -> URL? {
@@ -60,6 +63,7 @@ private struct RecommendationRow: View {
     }
 }
 
+/// One day's logged meals, as its own card.
 private struct DayLog: View {
     let day: Day
     @Environment(AppModel.self) private var model
@@ -67,32 +71,30 @@ private struct DayLog: View {
     var body: some View {
         let meals = model.logs[day] ?? []
         VStack(spacing: 0) {
-            HStack {
-                Text("\(day.relativeLabel(to: model.today)) · \(day.weekdayShort) \(day.dayOfMonth) \(day.monthShort)")
-                    .mono(color: Theme.ink)
-                Spacer(minLength: 8)
-                Text("\(String(meals.map(\.macros).total.kcal)) KCAL").mono()
-            }
-            .padding(.bottom, 10)
-            .overlay(alignment: .bottom) { Hairline(color: Theme.hairlineStrong) }
+            CardTitle(
+                title: "\(day.relativeLabel(to: model.today)) · \(day.weekdayShort) \(day.dayOfMonth) \(day.monthShort)",
+                trailing: "\(String(meals.map(\.macros).total.kcal)) kcal"
+            )
+            .padding(.vertical, 12)
 
             ForEach(meals) { meal in
                 Button {
-                    model.overlay = .meal(meal, day)
+                    model.present(.meal(meal, day))
                 } label: {
-                    FQRow {
-                        Text(meal.time).mono().frame(width: 44, alignment: .leading)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(meal.name).serif(color: Theme.ink).multilineTextAlignment(.leading)
-                            Text(meal.slot.label).mono()
+                    FQRow(divider: meal.id != meals.last?.id) {
+                        Text(meal.time).caption(13).frame(width: 42, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(meal.name).copy(color: Theme.ink).multilineTextAlignment(.leading)
+                            Text(meal.slot.label).caption()
                         }
                         Spacer(minLength: 0)
-                        Text("\(meal.macros.kcal)").mono(color: Theme.ink)
+                        Text("\(meal.macros.kcal)").heading(15)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
             }
         }
+        .aeroCard(vertical: 4)
     }
 }

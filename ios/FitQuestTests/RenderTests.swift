@@ -16,7 +16,8 @@ final class RenderTests: XCTestCase {
 
         let model = AppModel(today: Day(key: "2026-10-10"))
         let meal = try XCTUnwrap(model.logs[model.today]?[1])
-        let friend = SampleData.friends[1]
+        let friend = SampleData.members[1]
+        let song = try XCTUnwrap(SampleData.songs["ram"]?.first)
         let bench = try XCTUnwrap(model.activeTemplate?.exercises.first)
         model.toggleSet(0, of: bench)
 
@@ -25,15 +26,19 @@ final class RenderTests: XCTestCase {
             ("02-dashboard", AnyView(PageScroll { DashboardPage() })),
             ("03-workout", AnyView(PageScroll { WorkoutPage() })),
             ("04-gym", AnyView(PageScroll { GymPage() })),
+            ("17-gym-picker", AnyView(PageScroll { GymPage(pickerOpen: true) })),
             ("05-meal-detail", AnyView(MealDetail(meal: meal, day: model.today))),
             ("06-log-meal-capture", AnyView(LogMealFlow())),
             ("07-log-meal-review", AnyView(LogMealFlow(previewItems: SampleData.photoEstimate))),
             ("08-profile", AnyView(ProfileSheet())),
             ("09-pet", AnyView(PetSheet())),
-            ("10-friend", AnyView(FriendProfile(friend: friend))),
+            ("10-friend", AnyView(MemberProfile(member: friend))),
+            ("15-add-friend", AnyView(AddFriendSheet())),
+            ("16-song-listeners", AnyView(SongListenersSheet(song: song))),
             ("11-exercise", AnyView(ExerciseDetail(initialID: bench.id))),
+            ("14-template", AnyView(TemplateDetail(templateID: "push"))),
             ("12-about-exercise", AnyView(AboutExerciseCard(exercise: bench))),
-            ("13-nav", AnyView(NavBar().frame(height: 120))),
+            ("13-nav", AnyView(NavBar().frame(height: 140))),
         ]
 
         for (name, view) in screens {
@@ -41,8 +46,8 @@ final class RenderTests: XCTestCase {
                 .environment(model)
                 .environment(\.flatScroll, true)
                 .frame(width: 402)
-                .background(Theme.canvas)
-                .environment(\.colorScheme, .dark)
+                .background { AeroBackground() }
+                .environment(\.colorScheme, .light)
             let renderer = ImageRenderer(content: content)
             renderer.scale = 2
             let image = try XCTUnwrap(renderer.cgImage, name)

@@ -11,8 +11,7 @@ let package = Package(
         .target(
             name: "FitQuest",
             path: "FitQuest",
-            exclude: ["App/FitQuestApp.swift"],
-            resources: [.process("Resources")]
+            exclude: ["App/FitQuestApp.swift"]
         ),
         .testTarget(name: "FitQuestTests", dependencies: ["FitQuest"], path: "FitQuestTests"),
     ]

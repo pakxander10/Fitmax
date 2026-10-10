@@ -4,7 +4,7 @@ enum MealSlot: String, CaseIterable, Identifiable {
     case breakfast, lunch, dinner, snack
 
     var id: String { rawValue }
-    var label: String { rawValue.uppercased() }
+    var label: String { rawValue.capitalized }
 }
 
 enum MealSource: Equatable {
@@ -25,7 +25,7 @@ struct FoodItem: Identifiable, Equatable {
     enum Confidence: String {
         case low, medium, high
 
-        var label: String { rawValue.uppercased() }
+        var label: String { rawValue.capitalized }
     }
 
     let id = UUID()

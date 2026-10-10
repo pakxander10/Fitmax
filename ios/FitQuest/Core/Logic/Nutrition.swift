@@ -27,10 +27,28 @@ struct Targets: Equatable {
     var fat = 60
 }
 
-enum Mood: String {
-    case happy, hungry, sad, proud
+/// How the pet feels about the day. Each mood shows as one of several emoji, picked at random.
+enum Mood: String, CaseIterable {
+    case happy, neutral, moody
 
-    var label: String { rawValue.uppercased() }
+    var emojis: [String] {
+        switch self {
+        case .happy: ["😀", "😄", "😁", "😊", "🥰", "😎", "🤩", "😋", "🥳"]
+        case .neutral: ["🙂", "😐", "😶", "🤔", "😌", "🥱", "😴", "🫤"]
+        case .moody: ["😔", "😢", "😞", "🥺", "😩", "😤", "😒", "🙄"]
+        }
+    }
+
+    /// A face from this mood's pool, never the one just shown.
+    func randomEmoji<G: RandomNumberGenerator>(excluding last: String? = nil, using generator: inout G) -> String {
+        let pool = emojis.filter { $0 != last }
+        return pool.randomElement(using: &generator) ?? emojis[0]
+    }
+
+    func randomEmoji(excluding last: String? = nil) -> String {
+        var generator = SystemRandomNumberGenerator()
+        return randomEmoji(excluding: last, using: &generator)
+    }
 }
 
 enum Nutrition {
@@ -39,8 +57,11 @@ enum Nutrition {
         abs(consumed - target) * 10 <= target
     }
 
+    /// Happy once the workout is done or calories are on target; moody when the day has gone
+    /// badly wrong (under half the target, or more than 15% over); otherwise neutral.
     static func mood(consumedKcal: Int, targetKcal: Int, workoutDone: Bool) -> Mood {
-        if workoutDone, calorieGoalMet(consumed: consumedKcal, target: targetKcal) { return .proud }
-        return consumedKcal * 2 < targetKcal ? .hungry : .happy
+        if workoutDone || calorieGoalMet(consumed: consumedKcal, target: targetKcal) { return .happy }
+        if consumedKcal * 2 < targetKcal || consumedKcal * 100 > targetKcal * 115 { return .moody }
+        return .neutral
     }
 }

@@ -2,17 +2,6 @@ import XCTest
 @testable import FitQuest
 
 final class GameMathTests: XCTestCase {
-    // feature_game.md A3
-    func testRankThresholdsMatchSpec() {
-        let cases: [(Int, HunterRank)] = [
-            (0, .e), (499, .e), (500, .d), (1_499, .d), (1_500, .c),
-            (3_499, .c), (3_500, .b), (7_000, .a), (12_000, .s),
-        ]
-        for (xp, rank) in cases {
-            XCTAssertEqual(HunterRank.forXP(xp), rank, "xp \(xp)")
-        }
-    }
-
     func testLevelIsFloorSqrtOfXPOverFifty() {
         XCTAssertEqual(GameState(xp: 0).level, 0)
         XCTAssertEqual(GameState(xp: 50).level, 1)
@@ -21,19 +10,21 @@ final class GameMathTests: XCTestCase {
         XCTAssertEqual(GameState(xp: 1_340).level, 5)
     }
 
-    func testProgressTowardNextRank() {
-        let game = GameState(xp: 1_340)
-        XCTAssertEqual(game.rank, .d)
-        XCTAssertEqual(game.nextRank, .c)
-        XCTAssertEqual(game.xpToNext, 160)
-        XCTAssertEqual(game.progress, 0.84, accuracy: 0.0001)
+    func testXPRequiredForALevelInvertsTheLevelFormula() {
+        for level in 0...20 {
+            let needed = GameState.xpRequired(forLevel: level)
+            XCTAssertEqual(GameState(xp: needed).level, level)
+            if level > 0 { XCTAssertEqual(GameState(xp: needed - 1).level, level - 1) }
+        }
     }
 
-    func testTopRankHasNoNextRank() {
-        let game = GameState(xp: 20_000)
-        XCTAssertEqual(game.rank, .s)
-        XCTAssertNil(game.nextRank)
-        XCTAssertEqual(game.xpToNext, 0)
-        XCTAssertEqual(game.progress, 1)
+    func testProgressTowardNextLevel() {
+        // Level 5 starts at 1,250 XP and level 6 at 1,800.
+        let game = GameState(xp: 1_340)
+        XCTAssertEqual(game.xpToNextLevel, 460)
+        XCTAssertEqual(game.progress, 90.0 / 550.0, accuracy: 0.0001)
+
+        XCTAssertEqual(GameState(xp: 1_250).progress, 0)
+        XCTAssertEqual(GameState(xp: 0).xpToNextLevel, 50)
     }
 }

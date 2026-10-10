@@ -26,11 +26,11 @@ struct Day: Hashable, Comparable, Codable {
 
     func relativeLabel(to today: Day) -> String {
         switch days(since: today) {
-        case 0: "TODAY"
-        case -1: "YESTERDAY"
-        case 1: "TOMORROW"
-        case let n where n < 0: "\(-n) DAYS AGO"
-        case let n: "IN \(n) DAYS"
+        case 0: "Today"
+        case -1: "Yesterday"
+        case 1: "Tomorrow"
+        case let n where n < 0: "\(-n) days ago"
+        case let n: "In \(n) days"
         }
     }
 
@@ -46,9 +46,9 @@ struct Day: Hashable, Comparable, Codable {
         return calendar
     }()
 
-    private static let weekdaysShort = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+    private static let weekdaysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     private static let weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    private static let months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+    private static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
     private var components: [Int] {
         let parts = key.split(separator: "-").compactMap { Int($0) }

@@ -19,19 +19,19 @@ final class DayTests: XCTestCase {
 
     func testRelativeLabels() {
         let today = Day(key: "2026-10-10")
-        XCTAssertEqual(today.relativeLabel(to: today), "TODAY")
-        XCTAssertEqual(today.adding(-1).relativeLabel(to: today), "YESTERDAY")
-        XCTAssertEqual(today.adding(1).relativeLabel(to: today), "TOMORROW")
-        XCTAssertEqual(today.adding(-3).relativeLabel(to: today), "3 DAYS AGO")
-        XCTAssertEqual(today.adding(2).relativeLabel(to: today), "IN 2 DAYS")
+        XCTAssertEqual(today.relativeLabel(to: today), "Today")
+        XCTAssertEqual(today.adding(-1).relativeLabel(to: today), "Yesterday")
+        XCTAssertEqual(today.adding(1).relativeLabel(to: today), "Tomorrow")
+        XCTAssertEqual(today.adding(-3).relativeLabel(to: today), "3 days ago")
+        XCTAssertEqual(today.adding(2).relativeLabel(to: today), "In 2 days")
     }
 
     func testDisplayParts() {
         let day = Day(key: "2026-10-03")
-        XCTAssertEqual(day.weekdayShort, "SAT")
+        XCTAssertEqual(day.weekdayShort, "Sat")
         XCTAssertEqual(day.weekdayName, "Saturday")
         XCTAssertEqual(day.dayOfMonth, "03")
-        XCTAssertEqual(day.monthShort, "OCT")
+        XCTAssertEqual(day.monthShort, "Oct")
     }
 
     func testOrdering() {

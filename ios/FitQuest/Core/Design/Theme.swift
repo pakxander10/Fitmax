@@ -1,52 +1,53 @@
-import CoreText
 import SwiftUI
 
-/// Design tokens: a monochrome black canvas with white display type, serif body and mono labels.
-/// Weight 400 everywhere; emphasis comes from size, tracking, case and family.
+/// Frutiger Aero tokens: a bright sky behind frosted-glass panels, with glossy aqua and
+/// green controls. Dark navy text sits on glass; white text sits only on the top of the sky.
 enum Theme {
-    // MARK: Colour
+    // MARK: Sky
 
-    static let white = Color(hex: 0xFFFFFF)
-    static let ink = Color(hex: 0xFFFFFF)
-    static let body = Color(hex: 0xCCCCCC)
-    static let bodyStrong = Color(hex: 0xE6E6E6)
-    static let muted = Color(hex: 0x999999)
-    static let mutedSoft = Color(hex: 0x666666)
+    static let skyTop = Color(hex: 0x0E78DA)
+    static let skyMid = Color(hex: 0x38B2F4)
+    static let skyLow = Color(hex: 0x9CE6F4)
+    static let meadow = Color(hex: 0xC9F6C6)
 
-    static let canvas = Color(hex: 0x000000)
-    static let surfaceSoft = Color(hex: 0x0D0D0D)
-    static let surfaceCard = Color(hex: 0x141414)
-    static let surfaceElevated = Color(hex: 0x1F1F1F)
+    // MARK: Text
 
-    static let hairline = Color(hex: 0x262626)
-    static let hairlineStrong = Color(hex: 0x3A3A3A)
+    static let ink = Color(hex: 0x0A3560)
+    static let body = Color(hex: 0x25557A)
+    static let muted = Color(hex: 0x4C7391)
+    static let onSky = Color.white
+    static let link = Color(hex: 0x0A66C8)
 
-    static let link = Color(hex: 0xC3D9F3)
-    static let warning = Color(hex: 0xD4A017)
-    static let success = Color(hex: 0x5FA657)
+    // MARK: Surfaces
+
+    static let divider = Color(hex: 0x0A3560).opacity(0.12)
+    static let well = Color(hex: 0xD9F0FF)
+    static let glass = LinearGradient(
+        colors: [.white.opacity(0.96), Color(hex: 0xE4F5FF).opacity(0.88)],
+        startPoint: .top, endPoint: .bottom
+    )
+
+    // MARK: Accents
+
+    static let aqua = Color(hex: 0x35AEEF)
+    static let azure = Color(hex: 0x0A5FC0)
+    static let lime = Color(hex: 0x5DBE1A)
+    static let green = Color(hex: 0x1C7F10)
+    static let warning = Color(hex: 0xC76A00)
+    static let success = green
+
+    static let blueGloss = LinearGradient(colors: [aqua, azure], startPoint: .top, endPoint: .bottom)
+    static let greenGloss = LinearGradient(colors: [lime, green], startPoint: .top, endPoint: .bottom)
+    static let pearlGloss = LinearGradient(colors: [.white, Color(hex: 0xCDEAFF)], startPoint: .top, endPoint: .bottom)
+    /// Soft green wash for "done" tiles that still need dark text on top.
+    static let leafWash = LinearGradient(colors: [Color(hex: 0xDFF9B8), Color(hex: 0xA9E660)], startPoint: .top, endPoint: .bottom)
 
     // MARK: Type
 
-    static func display(_ size: CGFloat) -> Font { font("SairaCondensed-Regular", size) }
-    static func text(_ size: CGFloat) -> Font { font("EBGaramond-Regular", size) }
-    static func mono(_ size: CGFloat) -> Font { font("JetBrainsMono-Regular", size) }
-
-    private static func font(_ name: String, _ size: CGFloat) -> Font {
-        _ = registerFonts
-        return .custom(name, size: size)
-    }
-
-    /// Registers the bundled fonts on first use, so previews and tests need no setup.
-    private static let registerFonts: Void = {
-        #if SWIFT_PACKAGE
-        let bundle = Bundle.module
-        #else
-        let bundle = Bundle.main
-        #endif
-        for url in bundle.urls(forResourcesWithExtension: "ttf", subdirectory: nil) ?? [] {
-            CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
-        }
-    }()
+    // Avenir Next ships with iOS and is Adrian Frutiger's own design, so nothing is bundled.
+    static func heading(_ size: CGFloat) -> Font { .custom("AvenirNext-DemiBold", size: size) }
+    static func copy(_ size: CGFloat) -> Font { .custom("AvenirNext-Regular", size: size) }
+    static func caption(_ size: CGFloat) -> Font { .custom("AvenirNext-Medium", size: size) }
 }
 
 extension Color {
@@ -60,19 +61,32 @@ extension Color {
 }
 
 extension View {
-    /// Uppercase tracked headline. 32/2 is the page title, 20/1 a section title, 16/1.5 a row title.
-    func display(_ size: CGFloat = 32, tracking: CGFloat = 2, color: Color = Theme.ink) -> some View {
-        font(Theme.display(size)).tracking(tracking).textCase(.uppercase).foregroundStyle(color)
+    /// Titles and figures.
+    func heading(_ size: CGFloat = 30, color: Color = Theme.ink) -> some View {
+        font(Theme.heading(size)).foregroundStyle(color)
     }
 
-    /// Sentence-case serif running text.
-    func serif(_ size: CGFloat = 16, color: Color = Theme.body) -> some View {
-        font(Theme.text(size)).foregroundStyle(color)
+    /// Running text.
+    func copy(_ size: CGFloat = 16, color: Color = Theme.body) -> some View {
+        font(Theme.copy(size)).foregroundStyle(color)
     }
 
-    /// Uppercase mono label for metadata, units and captions.
-    func mono(_ size: CGFloat = 11, tracking: CGFloat = 2, color: Color = Theme.muted) -> some View {
-        font(Theme.mono(size)).tracking(tracking).textCase(.uppercase).foregroundStyle(color)
+    /// Small labels: metadata, units, captions.
+    func caption(_ size: CGFloat = 12, color: Color = Theme.muted) -> some View {
+        font(Theme.caption(size)).foregroundStyle(color)
+    }
+
+    /// Lifts white text off the sky.
+    func skyShadow() -> some View {
+        shadow(color: Theme.ink.opacity(0.35), radius: 2, y: 1)
+    }
+
+    /// Frosted-glass panel behind a section of content.
+    func aeroCard(horizontal: CGFloat = 16, vertical: CGFloat = 16) -> some View {
+        padding(.horizontal, horizontal)
+            .padding(.vertical, vertical)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background { GlassPanel() }
     }
 
     func numericKeyboard(decimal: Bool = false) -> some View {

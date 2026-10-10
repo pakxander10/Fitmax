@@ -33,15 +33,13 @@ enum SampleData {
         ]
     }
 
-    /// Past days' (calories on target, workout done), newest last.
-    static func history(today: Day) -> [Day: DayStatus] {
-        let past: [(Bool, Bool)] = [
-            (true, true), (true, false), (false, true), (true, true), (true, true),
-            (false, false), (true, true), (true, false), (true, true),
-        ]
-        var result: [Day: DayStatus] = [:]
-        for (index, entry) in past.enumerated() {
-            result[today.adding(index - past.count)] = DayStatus(calories: entry.0, workout: entry.1)
+    /// Whether calories landed on target for each past day, newest last.
+    /// Past workout days come from `sessions`, so the two can't disagree.
+    static func calorieHistory(today: Day) -> [Day: Bool] {
+        let past = [true, true, false, true, true, false, true, true, true]
+        var result: [Day: Bool] = [:]
+        for (index, met) in past.enumerated() {
+            result[today.adding(index - past.count)] = met
         }
         return result
     }
@@ -97,38 +95,75 @@ enum SampleData {
         ]
     }()
 
+    static func sessions(today: Day) -> [WorkoutSession] {
+        func session(_ template: String, _ daysAgo: Int, _ minutes: Int, _ volume: Int, _ sets: Int, _ highlight: String) -> WorkoutSession {
+            WorkoutSession(id: "\(template)-\(daysAgo)", templateID: template, day: today.adding(-daysAgo), minutes: minutes, volume: volume, sets: sets, highlight: highlight)
+        }
+        return [
+            session("legs", 1, 61, 21_480, 13, "Back squat 200 × 7"),
+            session("push", 3, 54, 11_940, 16, "Barbell bench press 150 × 8"),
+            session("pull", 5, 49, 9_860, 13, "Barbell row 130 × 8"),
+            session("legs", 6, 63, 20_910, 13, "Back squat 200 × 6"),
+            session("push", 7, 57, 11_620, 16, "Barbell bench press 150 × 7"),
+            session("pull", 9, 51, 9_540, 13, "Barbell row 130 × 7"),
+            session("push", 12, 52, 11_180, 15, "Barbell bench press 145 × 8"),
+            session("pull", 13, 47, 9_210, 13, "Barbell row 125 × 8"),
+            session("legs", 15, 58, 20_240, 12, "Back squat 195 × 7"),
+            session("push", 17, 58, 10_860, 16, "Barbell bench press 145 × 7"),
+        ]
+    }
+
     // MARK: Gym
 
     static let gyms = [
-        Gym(id: "ram", name: "Ram Fitness · Chapel Hill", logo: "RF", friendsHere: 3),
-        Gym(id: "cs", name: "Carolina Strength Co.", logo: "CS", friendsHere: 1),
+        Gym(id: "ram", name: "Ram Fitness · Chapel Hill", logo: "RF"),
+        Gym(id: "cs", name: "Carolina Strength Co.", logo: "CS"),
     ]
 
     static let songs: [String: [Song]] = [
         "ram": [
-            Song(title: "Tokyo Drift", artist: "Teriyaki Boyz", listeners: ["JK", "MP", "SL"], more: 5),
-            Song(title: "Till I Collapse", artist: "Eminem", listeners: ["DR", "AN"], more: 3),
-            Song(title: "Can’t Hold Us", artist: "Macklemore & Ryan Lewis", listeners: ["SL", "TW", "JK"], more: 2),
-            Song(title: "Stronger", artist: "Kanye West", listeners: ["MP"], more: 4),
-            Song(title: "Eye of the Tiger", artist: "Survivor", listeners: ["AN", "DR"], more: 1),
+            Song(title: "Tokyo Drift", artist: "Teriyaki Boyz", listeningNow: ["JK", "MP", "SL", "PS"], listenedThisWeek: ["LM", "HC", "ZP", "OH"]),
+            Song(title: "Till I Collapse", artist: "Eminem", listeningNow: ["DR", "GL"], listenedThisWeek: ["AN", "BO", "MR"]),
+            Song(title: "Can’t Hold Us", artist: "Macklemore & Ryan Lewis", listeningNow: ["LM"], listenedThisWeek: ["JK", "SL", "HC", "OH"]),
+            Song(title: "Stronger", artist: "Kanye West", listeningNow: ["BO"], listenedThisWeek: ["MP", "PS", "ZP", "GL"]),
+            Song(title: "Eye of the Tiger", artist: "Survivor", listeningNow: [], listenedThisWeek: ["AN", "DR", "MR"]),
         ],
         "cs": [
-            Song(title: "Lose Yourself", artist: "Eminem", listeners: ["TW", "NB"], more: 6),
-            Song(title: "POWER", artist: "Kanye West", listeners: ["NB"], more: 2),
-            Song(title: "Remember the Name", artist: "Fort Minor", listeners: ["TW"], more: 3),
-            Song(title: "Tokyo Drift", artist: "Teriyaki Boyz", listeners: ["CH"], more: 1),
-            Song(title: "Seven Nation Army", artist: "The White Stripes", listeners: ["NB", "CH"], more: 0),
+            Song(title: "Lose Yourself", artist: "Eminem", listeningNow: ["TW", "EP", "TB"], listenedThisWeek: ["NB", "IO", "RM", "SR", "DC"]),
+            Song(title: "POWER", artist: "Kanye West", listeningNow: ["NB"], listenedThisWeek: ["RM", "DC"]),
+            Song(title: "Remember the Name", artist: "Fort Minor", listeningNow: ["IO"], listenedThisWeek: ["TW", "EP", "SR"]),
+            Song(title: "Tokyo Drift", artist: "Teriyaki Boyz", listeningNow: [], listenedThisWeek: ["CH", "TB"]),
+            Song(title: "Seven Nation Army", artist: "The White Stripes", listeningNow: ["RM"], listenedThisWeek: ["NB", "CH"]),
         ],
     ]
 
-    static let friends = [
-        Friend(initials: "JK", name: "Jordan Kim", gymID: "ram", atGym: true, rank: .c, level: 8, streak: 12, since: "17:20", song: "Tokyo Drift", pet: "Mochi · cat", week: "3/4"),
-        Friend(initials: "MP", name: "Maya Patel", gymID: "ram", atGym: true, rank: .b, level: 11, streak: 21, since: "17:45", song: "Stronger", pet: "Atlas · dog", week: "4/5"),
-        Friend(initials: "SL", name: "Sam Lee", gymID: "ram", atGym: true, rank: .d, level: 4, streak: 3, since: "18:05", song: "Can’t Hold Us", pet: "Pip · rabbit", week: "2/3"),
-        Friend(initials: "DR", name: "Diego Ruiz", gymID: "ram", atGym: false, rank: .c, level: 7, streak: 0, since: nil, song: "Till I Collapse", pet: "Rocco · dog", week: "1/4"),
-        Friend(initials: "AN", name: "Ava Nguyen", gymID: "ram", atGym: false, rank: .e, level: 2, streak: 1, since: nil, song: nil, pet: "Bean · hamster", week: "1/3"),
-        Friend(initials: "TW", name: "Theo Walsh", gymID: "cs", atGym: true, rank: .a, level: 15, streak: 34, since: "16:50", song: "Lose Yourself", pet: "Duke · dog", week: "5/5"),
-        Friend(initials: "NB", name: "Nia Brooks", gymID: "cs", atGym: false, rank: .c, level: 9, streak: 5, since: nil, song: "POWER", pet: "Kiwi · bird", week: "2/4"),
-        Friend(initials: "CH", name: "Chris Hall", gymID: "cs", atGym: false, rank: .d, level: 5, streak: 2, since: nil, song: nil, pet: "Toast · cat", week: "2/4"),
+    static let initialFriendIDs: Set<String> = ["JK", "MP", "SL", "DR", "AN", "TW", "NB", "CH"]
+
+    /// Everyone on the app. The first eight are the user's friends to begin with.
+    static let members = [
+        Member(initials: "JK", name: "Jordan Kim", gymID: "ram", atGym: true, level: 8, streak: 12, since: "17:20", song: "Tokyo Drift", pet: "Mochi · cat", week: "3/4"),
+        Member(initials: "MP", name: "Maya Patel", gymID: "ram", atGym: true, level: 11, streak: 21, since: "17:45", song: "Tokyo Drift", pet: "Atlas · dog", week: "4/5"),
+        Member(initials: "SL", name: "Sam Lee", gymID: "ram", atGym: true, level: 4, streak: 3, since: "18:05", song: "Tokyo Drift", pet: "Pip · rabbit", week: "2/3"),
+        Member(initials: "DR", name: "Diego Ruiz", gymID: "ram", atGym: false, level: 7, streak: 0, since: nil, song: "Till I Collapse", pet: "Rocco · dog", week: "1/4"),
+        Member(initials: "AN", name: "Ava Nguyen", gymID: "ram", atGym: false, level: 2, streak: 1, since: nil, song: nil, pet: "Bean · hamster", week: "1/3"),
+        Member(initials: "TW", name: "Theo Walsh", gymID: "cs", atGym: true, level: 15, streak: 34, since: "16:50", song: "Lose Yourself", pet: "Duke · dog", week: "5/5"),
+        Member(initials: "NB", name: "Nia Brooks", gymID: "cs", atGym: false, level: 9, streak: 5, since: nil, song: "POWER", pet: "Kiwi · bird", week: "2/4"),
+        Member(initials: "CH", name: "Chris Hall", gymID: "cs", atGym: false, level: 5, streak: 2, since: nil, song: nil, pet: "Toast · cat", week: "2/4"),
+
+        Member(initials: "PS", name: "Priya Shah", gymID: "ram", atGym: true, level: 9, streak: 16, since: "17:30", song: "Tokyo Drift", pet: "Nori · cat", week: "4/4"),
+        Member(initials: "LM", name: "Leo Martins", gymID: "ram", atGym: true, level: 6, streak: 4, since: "18:10", song: "Can’t Hold Us", pet: "Bolt · dog", week: "2/4"),
+        Member(initials: "HC", name: "Hannah Cole", gymID: "ram", atGym: false, level: 12, streak: 28, since: nil, song: nil, pet: "Clover · rabbit", week: "5/5"),
+        Member(initials: "OH", name: "Omar Haddad", gymID: "ram", atGym: false, level: 3, streak: 2, since: nil, song: nil, pet: "Figgy · hamster", week: "1/3"),
+        Member(initials: "GL", name: "Grace Liu", gymID: "ram", atGym: true, level: 10, streak: 9, since: "16:40", song: "Till I Collapse", pet: "Sushi · cat", week: "3/4"),
+        Member(initials: "BO", name: "Ben Ortiz", gymID: "ram", atGym: false, level: 5, streak: 6, since: nil, song: "Stronger", pet: "Tank · dog", week: "2/3"),
+        Member(initials: "ZP", name: "Zoe Park", gymID: "ram", atGym: false, level: 14, streak: 40, since: nil, song: nil, pet: "Miso · cat", week: "4/5", isPrivate: true),
+        Member(initials: "MR", name: "Marcus Reed", gymID: "ram", atGym: false, level: 8, streak: 7, since: nil, song: nil, pet: "Ziggy · bird", week: "3/4", isPrivate: true),
+
+        Member(initials: "EP", name: "Elena Petrova", gymID: "cs", atGym: true, level: 13, streak: 19, since: "17:05", song: "Lose Yourself", pet: "Luna · cat", week: "4/5"),
+        Member(initials: "TB", name: "Tyler Banks", gymID: "cs", atGym: true, level: 6, streak: 5, since: "17:50", song: "Lose Yourself", pet: "Moose · dog", week: "2/4"),
+        Member(initials: "IO", name: "Imani Okafor", gymID: "cs", atGym: true, level: 10, streak: 11, since: "18:00", song: "Remember the Name", pet: "Pepper · rabbit", week: "3/4"),
+        Member(initials: "RM", name: "Raj Mehta", gymID: "cs", atGym: false, level: 7, streak: 3, since: nil, song: "Seven Nation Army", pet: "Chai · cat", week: "2/3"),
+        Member(initials: "SR", name: "Sofia Rossi", gymID: "cs", atGym: false, level: 11, streak: 22, since: nil, song: nil, pet: "Gnocchi · dog", week: "4/4", isPrivate: true),
+        Member(initials: "DC", name: "Dylan Cho", gymID: "cs", atGym: false, level: 4, streak: 1, since: nil, song: nil, pet: "Pixel · hamster", week: "1/4"),
     ]
 }
