@@ -74,6 +74,9 @@ final class AppModel {
         calorieHistory = SampleData.calorieHistory(today: today)
     }
 
+    /// True while no Gemini key is configured and meal estimates are the canned sample foods.
+    var usesSampleFoodEstimates: Bool { foodAnalyzer is MockFoodAnalyzer }
+
     // MARK: Derived state
 
     var consumed: Macros { (logs[today] ?? []).map(\.macros).total }

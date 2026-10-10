@@ -16,7 +16,7 @@ final class NutritionTests: XCTestCase {
             base: Macros(kcal: 248, protein: 46, carbs: 0, fat: 5), confidence: .medium
         )
         XCTAssertEqual(chicken.macros.kcal, 248)
-        chicken.adjust(by: 10)
+        chicken.step(1)
         XCTAssertEqual(chicken.grams, 160)
         XCTAssertEqual(chicken.macros, Macros(kcal: 265, protein: 49, carbs: 0, fat: 5))
     }
@@ -26,9 +26,100 @@ final class NutritionTests: XCTestCase {
             name: "Toast", grams: 20,
             base: Macros(kcal: 50, protein: 2, carbs: 9, fat: 1), confidence: .high
         )
-        toast.adjust(by: -10)
-        toast.adjust(by: -10)
+        toast.step(-1)
+        toast.step(-1)
         XCTAssertEqual(toast.grams, 10)
+    }
+
+    // MARK: Typed amounts and servings
+
+    private func eggs() -> FoodItem {
+        FoodItem(
+            name: "Scrambled eggs", grams: 100,
+            base: Macros(kcal: 148, protein: 12, carbs: 1, fat: 10), confidence: .high,
+            serving: Serving(name: "egg", grams: 50)
+        )
+    }
+
+    func testTypedGramsReplaceTheEstimate() {
+        var chicken = FoodItem(name: "Chicken", grams: 150, base: Macros(kcal: 248, protein: 46, carbs: 0, fat: 5), confidence: .medium)
+        chicken.setAmount(300)
+        XCTAssertEqual(chicken.grams, 300)
+        XCTAssertEqual(chicken.amountText, "300")
+        XCTAssertEqual(chicken.macros, Macros(kcal: 496, protein: 92, carbs: 0, fat: 10))
+    }
+
+    func testNonsenseAmountsAreIgnoredAndHugeOnesCapped() {
+        var chicken = FoodItem(name: "Chicken", grams: 150, base: Macros(kcal: 248, protein: 46, carbs: 0, fat: 5), confidence: .medium)
+        chicken.setAmount(0)
+        chicken.setAmount(-20)
+        chicken.setAmount(.nan)
+        XCTAssertEqual(chicken.grams, 150)
+        chicken.setAmount(999_999)
+        XCTAssertEqual(chicken.grams, FoodItem.maxGrams)
+    }
+
+    func testServingsAndGramsDescribeTheSamePortion() {
+        var item = eggs()
+        XCTAssertEqual(item.unit, .grams)
+        XCTAssertEqual(item.amountText, "100")
+
+        item.setUnit(.servings)
+        XCTAssertEqual(item.unit, .servings)
+        XCTAssertEqual(item.amountText, "2")
+        XCTAssertEqual(item.grams, 100, "switching units must not change the portion")
+
+        item.setAmount(3)
+        XCTAssertEqual(item.grams, 150)
+        XCTAssertEqual(item.macros, Macros(kcal: 222, protein: 18, carbs: 2, fat: 15))
+
+        item.setUnit(.grams)
+        XCTAssertEqual(item.amountText, "150")
+    }
+
+    func testFractionalServingsSurviveARoundTrip() {
+        var item = FoodItem(name: "Peanut butter", grams: 32, base: Macros(kcal: 190, protein: 7, carbs: 7, fat: 16), confidence: .medium, serving: Serving(name: "tbsp", grams: 16))
+        item.setUnit(.servings)
+        item.setAmount(1.5)
+        XCTAssertEqual(item.grams, 24)
+        XCTAssertEqual(item.amountText, "1.5")
+        item.setAmount(0.25)
+        XCTAssertEqual(item.grams, 4)
+        XCTAssertEqual(item.amountText, "0.25")
+    }
+
+    func testStepSizeFollowsTheUnit() {
+        var item = eggs()
+        item.step(1)
+        XCTAssertEqual(item.grams, 110)
+        item.setUnit(.servings)
+        item.setAmount(2)
+        item.step(1)
+        XCTAssertEqual(item.amountText, "2.5")
+        item.step(-1)
+        item.step(-1)
+        item.step(-1)
+        item.step(-1)
+        item.step(-1)
+        XCTAssertEqual(item.amountText, "0.5", "a step that would empty the portion is ignored")
+    }
+
+    func testFoodsWithoutAServingStayInGrams() {
+        var chicken = FoodItem(name: "Chicken", grams: 150, base: Macros(kcal: 248, protein: 46, carbs: 0, fat: 5), confidence: .medium)
+        XCTAssertNil(chicken.serving)
+        chicken.setUnit(.servings)
+        XCTAssertEqual(chicken.unit, .grams)
+        XCTAssertEqual(chicken.amountText, "150")
+    }
+
+    func testParsingTypedAmounts() {
+        XCTAssertEqual(FoodItem.parseAmount("150"), 150)
+        XCTAssertEqual(FoodItem.parseAmount(" 1.5 "), 1.5)
+        XCTAssertEqual(FoodItem.parseAmount("1,5"), 1.5, "decimal comma keyboards")
+        XCTAssertEqual(FoodItem.parseAmount("2."), 2, "mid-typing")
+        XCTAssertNil(FoodItem.parseAmount(""))
+        XCTAssertNil(FoodItem.parseAmount("abc"))
+        XCTAssertNil(FoodItem.parseAmount("1.2.3"))
     }
 
     func testCalorieGoalIsMetWithinTenPercent() {

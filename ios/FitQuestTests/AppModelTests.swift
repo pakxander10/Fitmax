@@ -31,6 +31,15 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.toast, "+500 kcal logged · +10 XP")
     }
 
+    // Canned results must never pass for a real estimate.
+    func testSampleEstimatesAreFlaggedUntilARealAnalyzerIsConfigured() {
+        let model = makeModel()
+        model.foodAnalyzer = MockFoodAnalyzer()
+        XCTAssertTrue(model.usesSampleFoodEstimates)
+        model.foodAnalyzer = GeminiFoodAnalyzer(apiKey: "test-key")
+        XCTAssertFalse(model.usesSampleFoodEstimates)
+    }
+
     func testRemainingGoesNegativeWhenOverBudget() {
         let model = makeModel()
         let feast = FoodItem(name: "Feast", grams: 100, base: Macros(kcal: 1_100, protein: 0, carbs: 0, fat: 0), confidence: .low)

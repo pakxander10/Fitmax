@@ -12,6 +12,8 @@ struct LogMealFlow: View {
     @State private var items: [FoodItem]
     @State private var source = MealSource.photo
     @State private var notice: String?
+    /// The food whose amount field has the keyboard, if any.
+    @FocusState private var editingItem: FoodItem.ID?
     @State private var showingCamera = false
     @State private var camera = CameraModel()
 
@@ -27,6 +29,18 @@ struct LogMealFlow: View {
             case .capture: capture
             case .analysing: analysing
             case .review: review
+            }
+        }
+        // The number pad has no return key, so offer a way to put it away.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if editingItem != nil {
+                HStack {
+                    Spacer()
+                    FQButton(title: "Done", compact: true) { editingItem = nil }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Theme.glass)
             }
         }
     }
@@ -134,11 +148,17 @@ struct LogMealFlow: View {
     private var review: some View {
         let total = items.map(\.macros).total
         return VStack(alignment: .leading, spacing: 16) {
+            if model.usesSampleFoodEstimates {
+                Label("Sample result, not your meal. Add a Gemini key to Secrets.plist and rebuild for real estimates.", systemImage: "exclamationmark.triangle.fill")
+                    .font(Theme.caption(13))
+                    .foregroundStyle(Theme.warning)
+                    .aeroCard(vertical: 12)
+            }
             HStack(spacing: 16) {
                 FQRing(value: total.kcal, max: model.targets.kcal, size: 120)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(slot.label) · estimate").caption(13, color: Theme.ink)
-                    Text("Adjust grams if a portion looks off. Calories and macros update with it.").copy(14)
+                    Text("Type an amount or use − and + if a portion looks off. Calories and macros update with it.").copy(14)
                 }
             }
             .aeroCard()
@@ -150,12 +170,22 @@ struct LogMealFlow: View {
                             Text(item.name).copy(color: Theme.ink)
                             Text("\(item.macros.kcal) kcal · P \(item.macros.protein) · C \(item.macros.carbs) · F \(item.macros.fat) · \(item.confidence.label) confidence")
                                 .caption()
+                            if let serving = item.serving {
+                                Text("1 serving = 1 \(serving.name) · \(serving.grams.formatted(.number.precision(.fractionLength(0...1)))) g").caption()
+                            }
                         }
                         Spacer(minLength: 0)
-                        HStack(spacing: 0) {
-                            stepButton("minus", label: "Less \(item.name)") { item.adjust(by: -10) }
-                            Text("\(item.grams) g").heading(14).frame(width: 50)
-                            stepButton("plus", label: "More \(item.name)") { item.adjust(by: 10) }
+                        VStack(alignment: .trailing, spacing: 4) {
+                            HStack(spacing: 0) {
+                                stepButton("minus", label: "Less \(item.name)") { item.step(-1) }
+                                AmountField(item: $item, editing: $editingItem)
+                                stepButton("plus", label: "More \(item.name)") { item.step(1) }
+                            }
+                            if item.serving != nil {
+                                UnitSwitch(item: $item)
+                            } else {
+                                Text("grams").caption(11).padding(.trailing, 6)
+                            }
                         }
                     }
                 }
@@ -164,6 +194,7 @@ struct LogMealFlow: View {
 
             HStack(spacing: 12) {
                 FQButton(title: "Save to log") {
+                    editingItem = nil
                     model.saveMeal(slot: slot, items: items, source: source)
                 }
                 FQButton(title: "Retake", variant: .secondary) { step = .capture }
@@ -231,6 +262,78 @@ struct LogMealFlow: View {
         }
         .buttonStyle(PressStyle())
         .accessibilityLabel(label)
+    }
+}
+
+/// The portion as an editable number, in whichever unit the food is set to.
+private struct AmountField: View {
+    @Binding var item: FoodItem
+    var editing: FocusState<FoodItem.ID?>.Binding
+
+    @State private var text = ""
+
+    private var isEditing: Bool { editing.wrappedValue == item.id }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        TextField("", text: $text)
+            .font(Theme.heading(15))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(Theme.ink)
+            .tint(Theme.azure)
+            .textFieldStyle(.plain)
+            .numericKeyboard(decimal: true)
+            .focused(editing, equals: item.id)
+            .frame(width: 58, height: 36)
+            .background(shape.fill(.white))
+            .overlay(shape.strokeBorder(isEditing ? Theme.azure : Theme.aqua.opacity(0.5), lineWidth: 1))
+            .accessibilityLabel("Amount of \(item.name)")
+            .accessibilityValue("\(item.amountText) \(item.unit == .servings ? "servings" : "grams")")
+            .onAppear { text = item.amountText }
+            .onChange(of: text) {
+                // Half-typed or empty input is left alone until it reads as a number above zero.
+                if isEditing, let value = FoodItem.parseAmount(text) { item.setAmount(value) }
+            }
+            .onChange(of: item.amountText) {
+                // Follow the steppers and the unit switch, but never rewrite what is being typed
+                // while it still means the same amount ("1." must not snap back to "1").
+                if !isEditing || FoodItem.parseAmount(text) != FoodItem.parseAmount(item.amountText) { text = item.amountText }
+            }
+            .onChange(of: isEditing) {
+                if !isEditing { text = item.amountText }
+            }
+    }
+}
+
+/// Grams or servings, for foods that have a natural serving.
+private struct UnitSwitch: View {
+    @Binding var item: FoodItem
+
+    var body: some View {
+        HStack(spacing: 0) {
+            option("g", .grams, label: "Grams")
+            option("servings", .servings, label: "Servings")
+        }
+        .background(Capsule().fill(Theme.well))
+        .overlay(Capsule().strokeBorder(Theme.aqua.opacity(0.5), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Unit for \(item.name)")
+    }
+
+    private func option(_ title: String, _ unit: AmountUnit, label: String) -> some View {
+        let selected = item.unit == unit
+        return Button { item.setUnit(unit) } label: {
+            Text(title)
+                .caption(12, color: selected ? .white : Theme.link)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background { if selected { Glossy(shape: Capsule(), fill: Theme.blueGloss) } }
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

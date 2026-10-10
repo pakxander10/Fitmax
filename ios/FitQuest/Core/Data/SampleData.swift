@@ -54,15 +54,15 @@ enum SampleData {
     static var photoEstimate: [FoodItem] {
         [
             FoodItem(name: "Grilled chicken breast", grams: 150, base: Macros(kcal: 248, protein: 46, carbs: 0, fat: 5), confidence: .medium),
-            FoodItem(name: "Brown rice", grams: 180, base: Macros(kcal: 202, protein: 5, carbs: 42, fat: 2), confidence: .medium),
-            FoodItem(name: "Roasted broccoli", grams: 90, base: Macros(kcal: 50, protein: 3, carbs: 6, fat: 2), confidence: .high),
+            FoodItem(name: "Brown rice", grams: 180, base: Macros(kcal: 202, protein: 5, carbs: 42, fat: 2), confidence: .medium, serving: Serving(name: "cup", grams: 195)),
+            FoodItem(name: "Roasted broccoli", grams: 90, base: Macros(kcal: 50, protein: 3, carbs: 6, fat: 2), confidence: .high, serving: Serving(name: "cup", grams: 90)),
         ]
     }
 
     static var textEstimate: [FoodItem] {
         [
-            FoodItem(name: "Scrambled eggs (2)", grams: 100, base: Macros(kcal: 148, protein: 12, carbs: 1, fat: 10), confidence: .high),
-            FoodItem(name: "Whole wheat toast", grams: 40, base: Macros(kcal: 100, protein: 5, carbs: 17, fat: 1), confidence: .medium),
+            FoodItem(name: "Scrambled eggs (2)", grams: 100, base: Macros(kcal: 148, protein: 12, carbs: 1, fat: 10), confidence: .high, serving: Serving(name: "egg", grams: 50)),
+            FoodItem(name: "Whole wheat toast", grams: 40, base: Macros(kcal: 100, protein: 5, carbs: 17, fat: 1), confidence: .medium, serving: Serving(name: "slice", grams: 40)),
         ]
     }
 

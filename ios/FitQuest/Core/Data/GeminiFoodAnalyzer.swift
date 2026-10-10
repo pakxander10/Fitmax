@@ -10,6 +10,12 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
     var apiKey: String
     var model = "gemini-3.8-flash"
     var session: URLSession = .shared
+    /// Wait before the first retry; the second waits twice as long.
+    var retryDelay: Duration = .milliseconds(800)
+
+    private static let maxAttempts = 3
+    /// Statuses that mean "busy, try again", not "your request is wrong".
+    private static let transientStatuses: Set<Int> = [429, 500, 502, 503, 504]
 
     /// Reads `GEMINI_API_KEY` from the environment, then from a gitignored `Secrets.plist` in the bundle.
     static func fromConfig(bundle: Bundle = .main) -> GeminiFoodAnalyzer? {
@@ -31,11 +37,15 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: Self.body(for: input))
 
-        let (data, response) = try await session.data(for: request)
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-            throw AnalyzerError.badResponse(status)
+        var status = 0
+        for attempt in 0..<Self.maxAttempts {
+            if attempt > 0 { try await Task.sleep(for: retryDelay * attempt) }
+            let (data, response) = try await session.data(for: request)
+            status = (response as? HTTPURLResponse)?.statusCode ?? 200
+            if status == 200 { return try Self.parse(data) }
+            guard Self.transientStatuses.contains(status) else { break }
         }
-        return try Self.parse(data)
+        throw AnalyzerError.badResponse(status)
     }
 
     // MARK: Request
@@ -69,6 +79,9 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
                                 "name": ["type": "STRING"],
                                 "grams": number, "kcal": number, "protein": number, "carbs": number, "fat": number,
                                 "confidence": ["type": "STRING", "enum": ["low", "medium", "high"]],
+                                // Optional: only for foods with a natural serving.
+                                "serving_name": ["type": "STRING"],
+                                "serving_grams": ["type": "NUMBER"],
                             ],
                             "required": ["name", "grams", "kcal", "protein", "carbs", "fat", "confidence"],
                         ],
@@ -82,7 +95,10 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
     private static let prompt = """
     You are a nutrition estimator. For each food, estimate the portion in grams and the calories and \
     macros (protein, carbs, fat in grams) for that whole portion, not per 100 g. Use a short plain name. \
-    Set confidence to low when the portion or food is hard to judge. If there is no food, return an empty items list.
+    Set confidence to low when the portion or food is hard to judge. If there is no food, return an empty items list. \
+    When a food has a natural countable or household serving (an egg, a slice, a cup, a tablespoon, a piece), \
+    also give serving_name as one singular word and serving_grams as the weight of one serving. \
+    Leave both out for foods with no natural serving.
     """
 
     // MARK: Response
@@ -107,6 +123,15 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
             var carbs: Int
             var fat: Int
             var confidence: String
+            var serving_name: String?
+            var serving_grams: Double?
+
+            /// A serving only when Gemini gave both a usable name and a positive weight.
+            var serving: Serving? {
+                guard let grams = serving_grams, grams > 0, var name = serving_name?.trimmingCharacters(in: .whitespaces).lowercased() else { return nil }
+                if name.hasPrefix("1 ") { name.removeFirst(2) }
+                return name.isEmpty ? nil : Serving(name: name, grams: grams)
+            }
         }
         var items: [Item]
     }
@@ -119,9 +144,10 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
         return payload.items.filter { $0.grams > 0 }.map {
             FoodItem(
                 name: $0.name,
-                grams: $0.grams,
+                grams: Double($0.grams),
                 base: Macros(kcal: $0.kcal, protein: $0.protein, carbs: $0.carbs, fat: $0.fat),
-                confidence: FoodItem.Confidence(rawValue: $0.confidence.lowercased()) ?? .low
+                confidence: FoodItem.Confidence(rawValue: $0.confidence.lowercased()) ?? .low,
+                serving: $0.serving
             )
         }
     }
