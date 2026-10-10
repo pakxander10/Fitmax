@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Capture → analysing → review. Photo capture is a placeholder until the camera is wired;
-/// both paths go through `AppModel.foodAnalyzer`, which is where the backend call lands.
+/// Capture → analysing → review. Photos and typed entries both go through `AppModel.foodAnalyzer`.
 struct LogMealFlow: View {
     private enum Step { case capture, analysing, review }
 
@@ -13,6 +12,8 @@ struct LogMealFlow: View {
     @State private var items: [FoodItem]
     @State private var source = MealSource.photo
     @State private var notice: String?
+    @State private var showingCamera = false
+    @State private var camera = CameraModel()
 
     /// `previewItems` opens straight on the review step, for previews and render tests.
     init(previewItems: [FoodItem] = []) {
@@ -34,7 +35,7 @@ struct LogMealFlow: View {
 
     private var capture: some View {
         VStack(alignment: .leading, spacing: 16) {
-            PhotoPlaceholder(label: "Camera viewfinder", ratio: 1, symbol: "camera")
+            viewfinder
             if let notice {
                 Text(notice).copy(14, color: Theme.warning)
             }
@@ -54,7 +55,7 @@ struct LogMealFlow: View {
                     .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
-            Button { analyse(.photo) } label: {
+            Button(action: shutter) {
                 Glossy(shape: Circle(), fill: Theme.greenGloss)
                     .overlay(Circle().strokeBorder(.white, lineWidth: 3).padding(6))
                     .frame(width: 72, height: 72)
@@ -85,6 +86,37 @@ struct LogMealFlow: View {
             }
         }
         .aeroCard()
+        .task { await camera.start() }
+        .onDisappear { camera.stop() }
+        #if canImport(UIKit)
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker(
+                onCapture: { jpeg in
+                    showingCamera = false
+                    analyse(.photo(jpeg))
+                },
+                onCancel: { showingCamera = false }
+            )
+            .ignoresSafeArea()
+        }
+        #endif
+    }
+
+    /// Live camera in the square; the placeholder when there is no camera or access is denied.
+    @ViewBuilder private var viewfinder: some View {
+        #if os(iOS)
+        if camera.state == .running {
+            CameraPreview(session: camera.session)
+                .aspectRatio(1, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white, lineWidth: 1))
+                .accessibilityLabel("Camera viewfinder")
+        } else {
+            PhotoPlaceholder(label: "Camera viewfinder", ratio: 1, symbol: "camera")
+        }
+        #else
+        PhotoPlaceholder(label: "Camera viewfinder", ratio: 1, symbol: "camera")
+        #endif
     }
 
     private var analysing: some View {
@@ -144,6 +176,20 @@ struct LogMealFlow: View {
 
     private var trimmedText: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    private func shutter() {
+        guard camera.state == .running else {
+            showingCamera = true // no live camera: pick a photo instead
+            return
+        }
+        Task {
+            if let jpeg = await camera.capture() {
+                analyse(.photo(jpeg))
+            } else {
+                notice = "Couldn't take the photo — try again."
+            }
+        }
+    }
+
     private func logText() {
         guard !trimmedText.isEmpty else { return }
         analyse(.text(trimmedText))
@@ -154,7 +200,14 @@ struct LogMealFlow: View {
         notice = nil
         step = .analysing
         Task {
-            let found = (try? await model.foodAnalyzer.estimate(input)) ?? []
+            let found: [FoodItem]
+            do {
+                found = try await model.foodAnalyzer.estimate(input)
+            } catch {
+                notice = "Couldn't analyse that — check your connection and try again."
+                step = .capture
+                return
+            }
             if found.isEmpty {
                 // Never save silently when nothing was recognised.
                 notice = "No food detected — try again?"

@@ -56,7 +56,7 @@ final class AppModel {
     /// Not persisted yet, like the rest of the state.
     var hidesProfileFromNonFriends = false
 
-    @ObservationIgnored var foodAnalyzer: FoodAnalyzing = MockFoodAnalyzer()
+    @ObservationIgnored var foodAnalyzer: FoodAnalyzing = GeminiFoodAnalyzer.fromConfig() ?? MockFoodAnalyzer()
 
     private var progressByExercise: [String: ExerciseProgress] = [:]
     private var rewardedTemplates: Set<String> = []

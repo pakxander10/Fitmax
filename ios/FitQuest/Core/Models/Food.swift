@@ -60,7 +60,7 @@ struct MealRecommendation: Identifiable {
 }
 
 enum FoodInput: Equatable {
-    case photo
+    case photo(Data)
     case text(String)
 
     var source: MealSource {
