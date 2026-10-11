@@ -51,6 +51,7 @@ final class RenderTests: XCTestCase {
             ("26-onboarding-diet", AnyView(OnboardingFlow(step: .diet, draft: draft))),
             ("23-onboarding-targets", AnyView(OnboardingFlow(step: .targets, draft: draft))),
             ("24-launch", AnyView(LaunchScreen().frame(height: 400))),
+            ("27-background", AnyView(Color.clear.frame(height: 874))),
         ]
 
         for (name, view) in screens {
