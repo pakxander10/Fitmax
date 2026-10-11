@@ -96,6 +96,32 @@ extension View {
         self
         #endif
     }
+
+    /// Email keyboard, no capitals, no autocorrect, and the system's saved-email suggestions.
+    func emailEntry() -> some View {
+        #if os(iOS)
+        keyboardType(.emailAddress).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
+        #else
+        autocorrectionDisabled()
+        #endif
+    }
+
+    /// Lets the system offer a saved password, or suggest a strong one for a new account.
+    func passwordEntry(new: Bool) -> some View {
+        #if os(iOS)
+        textContentType(new ? .newPassword : .password)
+        #else
+        self
+        #endif
+    }
+
+    func nameEntry() -> some View {
+        #if os(iOS)
+        textContentType(.name).textInputAutocapitalization(.words).autocorrectionDisabled()
+        #else
+        autocorrectionDisabled()
+        #endif
+    }
 }
 
 extension EnvironmentValues {

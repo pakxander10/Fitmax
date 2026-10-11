@@ -60,6 +60,7 @@ final class GeminiFoodAnalyzerTests: XCTestCase {
     private func stubbedAnalyzer(statuses: [Int]) -> GeminiFoodAnalyzer {
         StubProtocol.statuses = statuses
         StubProtocol.requests = 0
+        StubProtocol.urls = []
         StubProtocol.body = envelope(#"{"items":[{"name":"Rice","grams":180,"kcal":202,"protein":5,"carbs":42,"fat":2,"confidence":"high"}]}"#)
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
@@ -85,6 +86,29 @@ final class GeminiFoodAnalyzerTests: XCTestCase {
             XCTFail("unexpected error \(error)")
         }
         XCTAssertEqual(StubProtocol.requests, 3)
+    }
+
+    // The free tier allows a small number of requests a day for each model, counted separately.
+    func testAUsedUpQuotaMovesOnToTheNextModel() async throws {
+        let analyzer = stubbedAnalyzer(statuses: [429])
+        let items = try await analyzer.estimate(.text("rice"))
+        XCTAssertEqual(items.map(\.name), ["Rice"])
+        XCTAssertEqual(StubProtocol.urls.count, 2)
+        XCTAssertTrue(StubProtocol.urls[0].contains("/\(analyzer.client.model):generateContent"))
+        XCTAssertTrue(StubProtocol.urls[1].contains("/\(analyzer.client.fallbackModels[0]):generateContent"))
+    }
+
+    func testReportsTheQuotaWhenEveryModelIsUsedUp() async {
+        let analyzer = stubbedAnalyzer(statuses: Array(repeating: 429, count: 10))
+        do {
+            _ = try await analyzer.estimate(.text("rice"))
+            XCTFail("expected a failure")
+        } catch GeminiFoodAnalyzer.AnalyzerError.badResponse(let status) {
+            XCTAssertEqual(status, 429)
+        } catch {
+            XCTFail("unexpected error \(error)")
+        }
+        XCTAssertEqual(StubProtocol.requests, 1 + analyzer.client.fallbackModels.count)
     }
 
     func testDoesNotRetryARejectedRequest() async {
@@ -113,17 +137,29 @@ final class GeminiFoodAnalyzerTests: XCTestCase {
 }
 
 /// Answers every request from a queue of status codes, then 200 with `body`.
-private final class StubProtocol: URLProtocol {
+/// Addresses listed in `pages` are answered from there instead, and not counted.
+final class StubProtocol: URLProtocol {
     static var statuses: [Int] = []
     static var requests = 0
     static var body = Data()
+    static var pages: [String: (status: Int, html: String)] = [:]
+    /// The address of every counted request, in order.
+    static var urls: [String] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
 
     override func startLoading() {
+        if let page = request.url.flatMap({ Self.pages[$0.absoluteString] }) {
+            let response = HTTPURLResponse(url: request.url!, statusCode: page.status, httpVersion: nil, headerFields: ["Content-Type": "text/html"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(page.html.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         Self.requests += 1
+        Self.urls.append(request.url?.absoluteString ?? "")
         let status = Self.statuses.isEmpty ? 200 : Self.statuses.removeFirst()
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

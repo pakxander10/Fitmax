@@ -2,6 +2,32 @@ import XCTest
 @testable import FitQuest
 
 final class NutritionTests: XCTestCase {
+    // MARK: Meal ideas
+
+    func testMealBudgetIsAShareOfTheDayButNeverMoreThanIsLeft() {
+        XCTAssertEqual(Nutrition.mealBudget(remainingKcal: 2_950, targetKcal: 2_950), 1_180, "Two fifths of the day")
+        XCTAssertEqual(Nutrition.mealBudget(remainingKcal: 2_000, targetKcal: 2_000), 800)
+        XCTAssertEqual(Nutrition.mealBudget(remainingKcal: 430, targetKcal: 2_000), 430, "All that is left")
+        XCTAssertEqual(Nutrition.mealBudget(remainingKcal: 150, targetKcal: 2_000), 150)
+    }
+
+    func testNoMealBudgetOnceTheDayIsNearlyUsedUp() {
+        XCTAssertNil(Nutrition.mealBudget(remainingKcal: 149, targetKcal: 2_000))
+        XCTAssertNil(Nutrition.mealBudget(remainingKcal: 0, targetKcal: 2_000))
+        XCTAssertNil(Nutrition.mealBudget(remainingKcal: -300, targetKcal: 2_000))
+    }
+
+    func testMealSlotFollowsTheClock() {
+        XCTAssertEqual(MealSlot.suggested(atHour: 5), .breakfast)
+        XCTAssertEqual(MealSlot.suggested(atHour: 10), .breakfast)
+        XCTAssertEqual(MealSlot.suggested(atHour: 11), .lunch)
+        XCTAssertEqual(MealSlot.suggested(atHour: 15), .lunch)
+        XCTAssertEqual(MealSlot.suggested(atHour: 16), .dinner)
+        XCTAssertEqual(MealSlot.suggested(atHour: 21), .dinner)
+        XCTAssertEqual(MealSlot.suggested(atHour: 22), .snack)
+        XCTAssertEqual(MealSlot.suggested(atHour: 3), .snack)
+    }
+
     func testTotalSumsEveryMacro() {
         let total = [
             Macros(kcal: 380, protein: 24, carbs: 52, fat: 9),

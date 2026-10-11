@@ -24,6 +24,8 @@ struct FQButton: View {
     let title: String
     var variant = Variant.primary
     var compact = false
+    /// Stretches to the full width on offer, for the one button that ends a form.
+    var wide = false
     let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
@@ -35,6 +37,7 @@ struct FQButton: View {
                 .shadow(color: variant == .primary ? Theme.green.opacity(0.7) : .clear, radius: 1, y: 1)
                 .lineLimit(1)
                 .padding(.horizontal, compact ? 18 : 26)
+                .frame(maxWidth: wide ? .infinity : nil)
                 .frame(height: 44)
                 .background {
                     Glossy(shape: Capsule(), fill: variant == .primary ? Theme.greenGloss : Theme.pearlGloss)
@@ -188,6 +191,59 @@ struct FQProgressLine: View {
                 }
             }
             .animation(.easeInOut(duration: 0.6), value: fraction)
+    }
+}
+
+/// A labelled white well around one text field. Pass the field itself, so the caller keeps
+/// its focus binding and keyboard settings.
+struct FQField<Content: View>: View {
+    let label: String
+    var focused = false
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).caption(13, color: Theme.ink).accessibilityHidden(true)
+            content
+                .font(Theme.copy(17))
+                .foregroundStyle(Theme.ink)
+                .tint(Theme.azure)
+                .textFieldStyle(.plain)
+                .accessibilityLabel(label)
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(shape.fill(.white))
+                .overlay(shape.strokeBorder(focused ? Theme.azure : Theme.aqua.opacity(0.6), lineWidth: focused ? 1.5 : 1))
+        }
+    }
+}
+
+/// A pill that is either picked or not: one of a set of choices.
+struct FQChip: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .caption(14, color: selected ? .white : Theme.link)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minWidth: 40, minHeight: 38)
+                .background {
+                    if selected {
+                        Glossy(shape: Capsule(), fill: Theme.blueGloss)
+                    } else {
+                        Capsule().fill(.white).overlay(Capsule().strokeBorder(Theme.aqua.opacity(0.6), lineWidth: 1))
+                    }
+                }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
