@@ -80,6 +80,9 @@ struct LogMealFlow: View {
             .accessibilityLabel("Take photo")
             .frame(maxWidth: .infinity)
 
+            PhotoImportButtons(onPhoto: { analyse(.photo($0)) }, onError: { notice = $0 })
+                .frame(maxWidth: .infinity)
+
             VStack(alignment: .leading, spacing: 6) {
                 Text("Or type what you ate").caption(13)
                 HStack(spacing: 10) {
