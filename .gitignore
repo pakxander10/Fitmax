@@ -6,3 +6,6 @@ DerivedData/
 .swiftpm/
 ios/FitQuest/Secrets.plist
 ios/FitQuest/GoogleService-Info.plist
+backend/worker/.venv/
+__pycache__/
+.pytest_cache/

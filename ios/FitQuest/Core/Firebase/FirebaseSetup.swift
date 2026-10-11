@@ -33,6 +33,19 @@ enum FirebaseSetup {
         }
     }
 
+    /// A fresh Firebase ID token for the scan worker, which checks it before using the GPU.
+    /// Signs in anonymously first if the launch sign-in has not finished yet.
+    static func idToken() async throws -> String {
+        let auth = Auth.auth()
+        let user: FirebaseAuth.User
+        if let current = auth.currentUser {
+            user = current
+        } else {
+            user = try await auth.signInAnonymously().user
+        }
+        return try await user.getIDToken()
+    }
+
     // Debug builds print a token in the Xcode console; register it under App Check > Manage debug tokens.
     // Release builds need the App Attest capability added in Signing & Capabilities.
     private static var providerFactory: AppCheckProviderFactory {

@@ -9,10 +9,12 @@ struct RootView: View {
     private static let pageKey = "fq-page"
 
     /// `foodAnalyzer` and `mealStore` replace the model's defaults when the app has better ones (Firebase).
-    init(foodAnalyzer: FoodAnalyzing? = nil, mealStore: MealStoring? = nil) {
+    /// `bodyScanner` is nil when this build has no scan server set up.
+    init(foodAnalyzer: FoodAnalyzing? = nil, mealStore: MealStoring? = nil, bodyScanner: BodyScanning? = nil) {
         let stored = UserDefaults.standard.object(forKey: Self.pageKey) as? Int
         let model = AppModel(page: stored.flatMap(AppModel.Page.init) ?? .dashboard, mealStore: mealStore ?? LocalMealStore())
         if let foodAnalyzer { model.foodAnalyzer = foodAnalyzer }
+        model.bodyScanner = bodyScanner
         _model = State(initialValue: model)
     }
 
@@ -94,6 +96,7 @@ struct RootView: View {
         case .logMeal: LogMealFlow()
         case .profile: ProfileSheet()
         case .editProfile: OnboardingFlow(editing: true, draft: model.profile.map(ProfileDraft.init) ?? ProfileDraft())
+        case .bodyScan: BodyScanFlow()
         case .pet: PetSheet()
         case .member(let member): MemberProfile(member: member)
         case .addFriend: AddFriendSheet()

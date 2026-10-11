@@ -7,12 +7,23 @@ struct ProfileSheet: View {
     private var account: Account { model.account ?? SampleData.account }
     private var profile: UserProfile { model.profile ?? SampleData.profile }
 
-    /// Height and weight come from onboarding; the rest wait for a body scan.
+    /// Height and weight come from onboarding; the rest from the latest body scan, in inches.
     private var biometrics: [(String, String)] {
-        [
-            (profile.heightText, "Height"), (profile.weightText, "Weight lb"), ("–", "Neck in"),
-            ("–", "Chest in"), ("–", "Waist in"), ("–", "Hips in"),
+        func inches(_ field: Biometrics.Field) -> String {
+            model.biometrics?.value(of: field).map { UserProfile.figure($0 / UserProfile.cmPerInch) } ?? "–"
+        }
+        return [
+            (profile.heightText, "Height"), (profile.weightText, "Weight lb"), (inches(.neck), "Neck in"),
+            (inches(.chest), "Chest in"), (inches(.waist), "Waist in"), (inches(.hips), "Hips in"),
         ]
+    }
+
+    private var scanSummary: String {
+        guard let scan = model.biometrics else {
+            return "Measurements and a body-fat estimate appear here after your first scan."
+        }
+        let fat = scan.bodyFatPct.map { "Body fat about \(UserProfile.figure($0))%" } ?? "Body fat not estimated"
+        return "\(fat) · estimates from a photo, not tape-measure readings."
     }
 
     private var facts: [(String, String)] {
@@ -48,11 +59,14 @@ struct ProfileSheet: View {
                 .aeroCard()
 
                 VStack(alignment: .leading, spacing: 12) {
-                    CardTitle(title: "Biometrics", trailing: "No scan yet")
+                    CardTitle(
+                        title: "Biometrics",
+                        trailing: model.biometrics.map { "Scanned \($0.measuredAt.formatted(date: .abbreviated, time: .omitted))" } ?? "No scan yet"
+                    )
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(biometrics, id: \.1) { SpecCell(value: $0.0, label: $0.1) }
                     }
-                    Text("Measurements and a body-fat estimate appear here after your first scan.")
+                    Text(scanSummary)
                         .caption()
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -82,7 +96,7 @@ struct ProfileSheet: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 12) {
-                        FQButton(title: "New scan") { model.flash("Scan · coming soon") }
+                        FQButton(title: "New scan") { model.present(.bodyScan) }
                         FQButton(title: "Edit", variant: .secondary) { model.present(.editProfile) }
                     }
                     Text("All body measurements are estimates from photos. Trends matter more than single readings. This app is not medical advice.")
@@ -97,5 +111,6 @@ struct ProfileSheet: View {
                 .aeroCard()
             }
         }
+        .task { await model.loadBiometrics() }
     }
 }
