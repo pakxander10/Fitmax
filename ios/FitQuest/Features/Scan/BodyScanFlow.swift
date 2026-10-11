@@ -104,6 +104,9 @@ struct BodyScanFlow: View {
                 }
                 FQButton(title: "Take photo", wide: true) { showingCamera = true }
                     .disabled(model.bodyScanner == nil)
+                PhotoImportButtons(onPhoto: scan, onError: { step = .failed($0) })
+                    .frame(maxWidth: .infinity)
+                    .disabled(model.bodyScanner == nil)
             }
             .aeroCard()
         }
@@ -169,6 +172,7 @@ struct BodyScanFlow: View {
                 FQButton(title: "Try again") { showingCamera = true }
                 FQButton(title: "Close", variant: .secondary, action: model.dismiss)
             }
+            PhotoImportButtons(onPhoto: scan, onError: { step = .failed($0) })
         }
         .aeroCard()
     }
