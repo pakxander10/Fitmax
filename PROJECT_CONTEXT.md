@@ -25,7 +25,7 @@ Built for a hackathon (HackNC, roughly 30 working hours, 3–4 people). Gemini i
 
 | # | Decision | Reason / consequence |
 |---|---|---|
-| D1 | **Body scan has two methods behind one interface**: (a) SAM 3D Body on a GPU worker, (b) on-device Vision silhouette + Navy formula. Build (b) first. | SAM 3D weights are gated on Hugging Face and the access request is **pending**. (b) has no external dependency, so it is the safety net and also the automatic fallback if the worker is down. |
+| D1 | **Body scan has two methods behind one interface**: (a) SAM 3D Body on a GPU worker, (b) on-device Vision silhouette + Navy formula. ~~Build (b) first.~~ **Update 2026-10-10: Hugging Face access was granted and the team chose (a) as the primary method; the worker is in `backend/worker/`. (b) remains the fallback on `503 {"fallback":"on_device"}`.** The worker authenticates the app with a Firebase ID token. | SAM 3D weights are gated on Hugging Face and the access request is **pending**. (b) has no external dependency, so it is the safety net and also the automatic fallback if the worker is down. |
 | D2 | **The 3D mesh is used only to extract biometrics.** It is never shown to the user. | Removes the 3D viewer from the MVP. The avatar is a separate stock 3D model (D7). |
 | D3 | **Which scan method is the default is decided by a tape-measure bake-off**, not by opinion. | No published accuracy test of SAM 3D Body for circumferences was found, and its repo documents no measurement output. See section 8.5. |
 | D4 | ~~Backend is Python (FastAPI).~~ **Superseded by D11 (2026-10-10).** | Was a team choice. The GPU scan worker (D1) is still Python and still runs outside Firebase. Photon (D6) would now need its own small server. |

@@ -1,0 +1,14 @@
+# Worker HTTP server and mesh measurement. SAM 3D Body itself (PyTorch, detectron2, MoGe)
+# is installed separately in Colab, following the repo's INSTALL.md; see colab_setup.ipynb.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+numpy>=1.26,<3
+trimesh==4.5.3
+scipy>=1.13  # trimesh mesh slicing
+networkx>=3.2  # trimesh joins slice segments into loops
+shapely==2.0.6
+pillow==11.0.0
+pillow-heif==0.21.0
+google-auth==2.37.0
+requests==2.32.3

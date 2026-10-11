@@ -30,7 +30,8 @@ uvicorn api.main:app --reload --port 8000        # run from backend/
 pytest backend/api/tests
 
 # Worker (needs a GPU; usually run in Colab, see backend/worker/colab_setup.ipynb)
-pytest backend/worker/tests                       # measure.py tests run on CPU with a sample mesh
+cd backend/worker && python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest tests                  # measure/navy/server tests on CPU with a synthetic mesh and a fake model
 
 # iOS: open ios/FitQuest.xcodeproj in Xcode; run on a real device for Vision/camera work
 cd ios && swift test                              # app logic tests on macOS (Firebase code is excluded)
