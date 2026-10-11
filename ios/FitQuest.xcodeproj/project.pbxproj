@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		095C7383307B122E00BE7BE3 /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = 095C7382307B122E00BE7BE3 /* FirebaseAILogic */; };
+		095C7385307B123E00BE7BE3 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 095C7384307B123E00BE7BE3 /* FirebaseFirestore */; };
+		095C7387307B124200BE7BE3 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 095C7386307B124200BE7BE3 /* FirebaseAuth */; };
+		095C7389307B124600BE7BE3 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 095C7388307B124600BE7BE3 /* FirebaseAppCheck */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		F10000000000000000000020 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -39,6 +46,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				095C7383307B122E00BE7BE3 /* FirebaseAILogic in Frameworks */,
+				095C7389307B124600BE7BE3 /* FirebaseAppCheck in Frameworks */,
+				095C7387307B124200BE7BE3 /* FirebaseAuth in Frameworks */,
+				095C7385307B123E00BE7BE3 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,11 +63,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		095C7381307B122E00BE7BE3 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		F10000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
 				F10000000000000000000006 /* FitQuest */,
 				F10000000000000000000007 /* FitQuestTests */,
+				095C7381307B122E00BE7BE3 /* Frameworks */,
 				F10000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +109,10 @@
 			);
 			name = FitQuest;
 			packageProductDependencies = (
+				095C7382307B122E00BE7BE3 /* FirebaseAILogic */,
+				095C7388307B124600BE7BE3 /* FirebaseAppCheck */,
+				095C7384307B123E00BE7BE3 /* FirebaseFirestore */,
+				095C7386307B124200BE7BE3 /* FirebaseAuth */,
 			);
 			productName = FitQuest;
 			productReference = F10000000000000000000004 /* FitQuest.app */;
@@ -146,6 +169,9 @@
 			);
 			mainGroup = F10000000000000000000002;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F10000000000000000000003 /* Products */;
 			projectDirPath = "";
@@ -355,6 +381,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		095C7382307B122E00BE7BE3 /* FirebaseAILogic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAILogic;
+		};
+		095C7384307B123E00BE7BE3 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		095C7386307B124200BE7BE3 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		095C7388307B124600BE7BE3 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0962FC4B307B0FC8004E00B2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F10000000000000000000001 /* Project object */;
 }

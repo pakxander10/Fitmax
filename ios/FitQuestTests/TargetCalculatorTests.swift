@@ -58,6 +58,15 @@ final class TargetCalculatorTests: XCTestCase {
         XCTAssertEqual(TargetCalculator.targets(for: man).kcal, 1_500)
     }
 
+    // Project safety rule: a target is never below what the body burns at rest.
+    func testCaloriesNeverDropBelowBMR() {
+        // Sedentary, so a fifth off maintenance (1.2 × BMR) would land at 0.96 × BMR.
+        let sedentary = profile(weightKg: 110, goal: .cut, days: 0)
+        let bmr = TargetCalculator.bmr(for: sedentary)
+        XCTAssertGreaterThan(bmr, 1_500, "Above the hard floor, so the BMR clamp is what is being tested")
+        XCTAssertGreaterThanOrEqual(Double(TargetCalculator.targets(for: sedentary).kcal), bmr)
+    }
+
     // MARK: Macros
 
     func testMacrosForTheLeanBulk() {

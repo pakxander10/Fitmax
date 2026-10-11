@@ -32,9 +32,10 @@ enum TargetCalculator {
         case .maintain: maintenance
         case .leanBulk: maintenance + leanBulkSurplus
         }
-        // Rounded to the nearest 10, and never below a safe minimum.
-        let floor = profile.sex == .male ? 1_500.0 : 1_200.0
-        let kcal = max(floor, (goalKcal / 10).rounded() * 10)
+        // Safety clamp: never below resting energy use, and never below a hard floor.
+        // The goal rounds to the nearest 10 kcal; the floor rounds up, so rounding cannot dip under it.
+        let floor = max(profile.sex == .male ? 1_500.0 : 1_200.0, bmr(for: profile))
+        let kcal = max((floor / 10).rounded(.up) * 10, (goalKcal / 10).rounded() * 10)
 
         let proteinPerKg: Double = switch profile.goal {
         case .cut: 2.2

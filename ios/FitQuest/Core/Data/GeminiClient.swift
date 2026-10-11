@@ -8,9 +8,9 @@ struct GeminiClient {
     enum ClientError: Error { case badResponse(Int), noContent }
 
     var apiKey: String
-    var model = "gemini-3.8-flash"
-    /// Tried in order when `model` has used up its quota. The free tier counts each model's requests separately.
-    var fallbackModels = ["gemini-3.7-flash", "gemini-3.6-flash"]
+    var model = GeminiFoodAnalyzer.defaultModel
+    /// Tried in order when `model` has used up its quota.
+    var fallbackModels = GeminiFoodAnalyzer.fallbackModels
     var session: URLSession = .shared
     /// Wait before the first retry; the second waits twice as long.
     var retryDelay: Duration = .milliseconds(800)
@@ -72,11 +72,16 @@ struct GeminiClient {
         var candidates: [Candidate]?
     }
 
-    /// Unwraps the JSON the model wrote from Gemini's response envelope and decodes it.
-    static func decode<Payload: Decodable>(_ type: Payload.Type, from data: Data) throws -> Payload {
+    /// The text the model wrote, out of Gemini's response envelope.
+    static func text(from data: Data) throws -> String {
         let envelope = try JSONDecoder().decode(Envelope.self, from: data)
         guard let text = envelope.candidates?.first?.content?.parts?.compactMap(\.text).joined(),
               !text.isEmpty else { throw ClientError.noContent }
-        return try JSONDecoder().decode(type, from: Data(text.utf8))
+        return text
+    }
+
+    /// Unwraps the JSON the model wrote from Gemini's response envelope and decodes it.
+    static func decode<Payload: Decodable>(_ type: Payload.Type, from data: Data) throws -> Payload {
+        try JSONDecoder().decode(type, from: Data(try text(from: data).utf8))
     }
 }

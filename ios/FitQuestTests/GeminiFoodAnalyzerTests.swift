@@ -55,6 +55,18 @@ final class GeminiFoodAnalyzerTests: XCTestCase {
         XCTAssertThrowsError(try GeminiFoodAnalyzer.parse(Data(#"{"candidates":[]}"#.utf8)))
     }
 
+    // The Firebase analyzer gets Gemini's JSON text without the REST envelope.
+    func testReadsBareItemsJSON() throws {
+        let items = try GeminiFoodAnalyzer.items(fromJSON:
+            #"{"items":[{"name":"Toast","grams":0,"kcal":0,"protein":0,"carbs":0,"fat":0,"confidence":"low"},{"name":"Egg","grams":50,"kcal":78,"protein":6,"carbs":1,"fat":5,"confidence":"MEDIUM"}]}"#)
+        XCTAssertEqual(items.map(\.name), ["Egg"])
+        XCTAssertEqual(items[0].confidence, .medium)
+    }
+
+    func testBareItemsJSONRejectsGarbage() {
+        XCTAssertThrowsError(try GeminiFoodAnalyzer.items(fromJSON: "not json"))
+    }
+
     // MARK: Retries
 
     private func stubbedAnalyzer(statuses: [Int]) -> GeminiFoodAnalyzer {
