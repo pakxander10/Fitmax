@@ -5,3 +5,4 @@ DerivedData/
 .build/
 .swiftpm/
 ios/FitQuest/Secrets.plist
+ios/FitQuest/GoogleService-Info.plist

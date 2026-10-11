@@ -7,8 +7,10 @@ import Foundation
 struct GeminiFoodAnalyzer: FoodAnalyzing {
     enum AnalyzerError: Error { case badResponse(Int), noContent }
 
+    static let defaultModel = "gemini-3.8-flash"
+
     var apiKey: String
-    var model = "gemini-3.8-flash"
+    var model = defaultModel
     var session: URLSession = .shared
     /// Wait before the first retry; the second waits twice as long.
     var retryDelay: Duration = .milliseconds(800)
@@ -55,11 +57,11 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
         switch input {
         case .photo(let jpeg):
             parts = [
-                ["text": "Identify every distinct food or drink in this photo."],
+                ["text": photoInstruction],
                 ["inline_data": ["mime_type": "image/jpeg", "data": jpeg.base64EncodedString()]],
             ]
         case .text(let description):
-            parts = [["text": "Identify every distinct food or drink in this description: \(description)"]]
+            parts = [["text": textInstruction(description)]]
         }
         parts.insert(["text": prompt], at: 0)
 
@@ -92,7 +94,13 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
         ]
     }
 
-    private static let prompt = """
+    static let photoInstruction = "Identify every distinct food or drink in this photo."
+
+    static func textInstruction(_ description: String) -> String {
+        "Identify every distinct food or drink in this description: \(description)"
+    }
+
+    static let prompt = """
     You are a nutrition estimator. For each food, estimate the portion in grams and the calories and \
     macros (protein, carbs, fat in grams) for that whole portion, not per 100 g. Use a short plain name. \
     Set confidence to low when the portion or food is hard to judge. If there is no food, return an empty items list. \
@@ -140,6 +148,11 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
         let envelope = try JSONDecoder().decode(Envelope.self, from: data)
         guard let text = envelope.candidates?.first?.content?.parts?.compactMap(\.text).joined(),
               !text.isEmpty else { throw AnalyzerError.noContent }
+        return try items(fromJSON: text)
+    }
+
+    /// Validates Gemini's `{"items": [...]}` JSON text and turns it into foods, dropping empty portions.
+    static func items(fromJSON text: String) throws -> [FoodItem] {
         let payload = try JSONDecoder().decode(Payload.self, from: Data(text.utf8))
         return payload.items.filter { $0.grams > 0 }.map {
             FoodItem(

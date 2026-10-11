@@ -11,7 +11,7 @@ let package = Package(
         .target(
             name: "FitQuest",
             path: "FitQuest",
-            exclude: ["App/FitQuestApp.swift", "Secrets.plist", "Secrets.example.plist"]
+            exclude: ["App/FitQuestApp.swift", "Core/Firebase", "Secrets.plist", "Secrets.example.plist", "GoogleService-Info.plist"]
         ),
         .testTarget(name: "FitQuestTests", dependencies: ["FitQuest"], path: "FitQuestTests"),
     ]
