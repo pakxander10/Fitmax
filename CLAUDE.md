@@ -9,7 +9,7 @@ An iPhone fitness app (SwiftUI, iOS 17+) with a **Firebase** backend (Anonymous 
 ## Repo layout
 
 ```
-ios/FitQuest/           SwiftUI app (Features/{Calorie,Dashboard,Workout,Gym}, Core/{Data,Design,Logic,Models,Firebase})
+ios/FitQuest/           SwiftUI app (Features/{Auth,Onboarding,Calorie,Dashboard,Workout,Gym}, Core/{Data,Design,Logic,Models,Firebase})
 ios/FitQuest/Core/Firebase/  everything that imports a Firebase module (excluded from ios/Package.swift)
 backend/api/            FastAPI app: routers/, services/, schemas.py, tests/
 backend/worker/         GPU scan service (SAM 3D Body) + measure.py (pure functions)

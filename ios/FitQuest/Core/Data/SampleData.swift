@@ -7,6 +7,14 @@ enum SampleData {
     static let startingPoints = 340
     static let streakDays = 6
 
+    /// Stand-ins for previews and render tests, where nobody is signed in.
+    static let account = Account(id: "sample", name: "Alex Moreno", email: "alex@example.com")
+    static let profile = UserProfile(
+        sex: .male, age: 24, heightCm: 70 * UserProfile.cmPerInch, weightKg: 165 * UserProfile.kgPerPound,
+        goal: .leanBulk, experience: .intermediate,
+        daysPerWeek: 4, injuries: [.shoulder], equipment: [.barbell, .dumbbells, .cables], diet: [.nutAllergy]
+    )
+
     // MARK: Food
 
     static func logs(today: Day) -> [Day: [Meal]] {
@@ -45,10 +53,10 @@ enum SampleData {
     }
 
     static let recommendations = [
-        MealRecommendation(name: "Salmon, quinoa and greens", kcal: 540, protein: 42, place: "Harbor Bowl", distance: "0.4 mi"),
-        MealRecommendation(name: "Chicken shawarma plate", kcal: 610, protein: 51, place: "Cedar Grill", distance: "0.7 mi"),
-        MealRecommendation(name: "Tofu, edamame and soba", kcal: 480, protein: 34, place: "Kumo Noodle", distance: "1.1 mi"),
-        MealRecommendation(name: "Turkey chili with beans", kcal: 450, protein: 38, place: "Franklin St. Kitchen", distance: "0.9 mi"),
+        MealRecommendation(name: "Salmon, quinoa and greens", kcal: 540, protein: 42, link: nil),
+        MealRecommendation(name: "Chicken shawarma plate", kcal: 610, protein: 51, link: nil),
+        MealRecommendation(name: "Tofu, edamame and soba", kcal: 480, protein: 34, link: nil),
+        MealRecommendation(name: "Turkey chili with beans", kcal: 450, protein: 38, link: nil),
     ]
 
     static var photoEstimate: [FoodItem] {

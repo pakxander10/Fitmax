@@ -5,6 +5,8 @@ import OSLog
 
 enum FirebaseSetup {
     private static let log = Logger(subsystem: "com.adharsh.fitquest", category: "firebase")
+    /// Set by `configure()`. Asking Firebase itself (`FirebaseApp.app()`) logs a warning when it is not set up.
+    private static var isConfigured = false
 
     /// Returns false when GoogleService-Info.plist is missing (it is gitignored), so a teammate
     /// without it still gets a working app on sample data instead of a launch crash.
@@ -15,12 +17,13 @@ enum FirebaseSetup {
         }
         AppCheck.setAppCheckProviderFactory(providerFactory)
         FirebaseApp.configure()
+        isConfigured = true
         return true
     }
 
     /// Every phone gets a user ID without a sign-up screen.
     static func signInIfNeeded() async {
-        guard FirebaseApp.app() != nil, Auth.auth().currentUser == nil else { return }
+        guard isConfigured, Auth.auth().currentUser == nil else { return }
         do {
             _ = try await Auth.auth().signInAnonymously()
         } catch {

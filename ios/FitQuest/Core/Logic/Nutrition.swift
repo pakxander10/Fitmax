@@ -52,6 +52,15 @@ enum Mood: String, CaseIterable {
 }
 
 enum Nutrition {
+    /// Below this many kcal left, the day counts as used up and no meal is suggested.
+    static let smallestMealKcal = 150
+
+    /// The most one suggested meal may cost: two fifths of the day's target, or whatever is left if that is less.
+    static func mealBudget(remainingKcal: Int, targetKcal: Int) -> Int? {
+        guard remainingKcal >= smallestMealKcal else { return nil }
+        return min(remainingKcal, targetKcal * 2 / 5)
+    }
+
     /// A day counts as on-target when intake lands within ±10% of the calorie target.
     static func calorieGoalMet(consumed: Int, target: Int) -> Bool {
         abs(consumed - target) * 10 <= target

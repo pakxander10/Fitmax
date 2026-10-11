@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// In-memory app state for the whole UI. Seeded from `SampleData`; nothing is persisted or
-/// fetched yet, so SwiftData and the API client slot in behind these same properties.
+/// App state for the whole UI. The account and profile come from `auth` and `profiles`;
+/// everything else is still seeded from `SampleData` and kept in memory.
 @Observable
 final class AppModel {
     enum Page: Int, CaseIterable, Identifiable {
@@ -24,6 +24,7 @@ final class AppModel {
         case meal(Meal, Day)
         case logMeal
         case profile
+        case editProfile
         case pet
         case member(Member)
         case addFriend
@@ -39,6 +40,34 @@ final class AppModel {
         case workoutComplete
     }
 
+    /// Which top-level screen to show.
+    enum Stage: Equatable {
+        /// Signed in, profile still loading.
+        case launching
+        case signedOut
+        /// Signed in, no profile yet.
+        case onboarding
+        case ready
+    }
+
+    struct NotSignedIn: Error {}
+
+    /// Where meal ideas come from, which decides how the Calorie page describes them.
+    enum RecommendationSource: Equatable {
+        case sample, ai, recipeDatabase
+    }
+
+    /// Where the Calorie page's meal ideas stand.
+    enum Recommendations: Equatable {
+        case idle, loading
+        case loaded([MealRecommendation])
+        /// Too few calories left today for another meal.
+        case budgetUsed
+        /// The service behind the ideas has used up its free requests.
+        case limitReached
+        case failed
+    }
+
     var today: Day
     var page: Page
     var toast: String?
@@ -47,7 +76,12 @@ final class AppModel {
     private(set) var overlays: [Overlay] = []
     var overlay: Overlay? { overlays.last }
 
-    let targets = Targets()
+    private(set) var account: Account?
+    private(set) var profile: UserProfile?
+    /// The last attempt to load the profile failed; the launch screen offers a retry.
+    private(set) var restoreFailed = false
+    private var profileLoaded = false
+
     var logs: [Day: [Meal]]
     var templates = SampleData.templates
     var activeTemplateID = "push"
@@ -56,26 +90,112 @@ final class AppModel {
     /// Not persisted yet, like the rest of the state.
     var hidesProfileFromNonFriends = false
 
+    private(set) var recommendations = Recommendations.idle
+    /// The request the current ideas answer, so the same one is never sent twice.
+    private var answeredRequest: MealRequest?
+
     @ObservationIgnored var foodAnalyzer: FoodAnalyzing = GeminiFoodAnalyzer.fromConfig() ?? MockFoodAnalyzer()
+    @ObservationIgnored var mealRecommender: MealRecommending = AppModel.configuredRecommender()
+    /// The clock, replaceable in tests.
+    @ObservationIgnored var now: () -> Date = { Date() }
+    @ObservationIgnored private let auth: AuthProviding
+    @ObservationIgnored private let profiles: ProfileStoring
 
     private var progressByExercise: [String: ExerciseProgress] = [:]
     private var rewardedTemplates: Set<String> = []
     private var friendIDs = SampleData.initialFriendIDs
     private var requestedIDs: Set<String> = []
     private var sessions: [WorkoutSession]
-    private let calorieHistory: [Day: Bool]
+    private var calorieHistory: [Day: Bool]
     @ObservationIgnored private var toastTask: Task<Void, Never>?
 
-    init(today: Day = Day(), page: Page = .dashboard) {
+    init(
+        today: Day = Day(), page: Page = .dashboard,
+        auth: AuthProviding = LocalAuthService(), profiles: ProfileStoring = LocalProfileStore(),
+        sampleMeals: Bool = false
+    ) {
         self.today = today
         self.page = page
-        logs = SampleData.logs(today: today)
+        self.auth = auth
+        self.profiles = profiles
+        account = auth.currentAccount
+        // A real account starts with an empty food log. The sample one is for previews and tests.
+        logs = sampleMeals ? SampleData.logs(today: today) : [:]
         sessions = SampleData.sessions(today: today)
-        calorieHistory = SampleData.calorieHistory(today: today)
+        calorieHistory = sampleMeals ? SampleData.calorieHistory(today: today) : [:]
     }
 
     /// True while no Gemini key is configured and meal estimates are the canned sample foods.
     var usesSampleFoodEstimates: Bool { foodAnalyzer is MockFoodAnalyzer }
+
+    /// True while accounts live only on this phone, before a real auth backend is configured.
+    var usesLocalAccounts: Bool { auth is LocalAuthService }
+
+    // MARK: Session
+
+    var stage: Stage {
+        guard account != nil else { return .signedOut }
+        guard profileLoaded else { return .launching }
+        return profile == nil ? .onboarding : .ready
+    }
+
+    /// Daily targets worked out from the profile. The defaults only show before onboarding.
+    var targets: Targets { profile.map(TargetCalculator.targets) ?? Targets() }
+
+    /// Loads the profile of whoever was signed in last time. Call once at launch, and again to retry.
+    @MainActor
+    func restoreSession() async {
+        guard let account, !profileLoaded else { return }
+        do {
+            profile = try await profiles.profile(for: account.id)
+            profileLoaded = true
+            restoreFailed = false
+        } catch {
+            restoreFailed = true
+        }
+    }
+
+    @MainActor
+    func signUp(name: String, email: String, password: String) async throws {
+        let account = try await auth.signUp(name: name, email: email, password: password)
+        start(account, profile: nil)
+    }
+
+    @MainActor
+    func signIn(email: String, password: String) async throws {
+        let account = try await auth.signIn(email: email, password: password)
+        start(account, profile: try await profiles.profile(for: account.id))
+    }
+
+    /// Saves the onboarding answers and opens the app.
+    @MainActor
+    func completeOnboarding(_ profile: UserProfile) async throws {
+        guard let account else { throw NotSignedIn() }
+        try await profiles.save(profile, for: account.id)
+        self.profile = profile
+    }
+
+    func signOut() {
+        try? auth.signOut()
+        account = nil
+        profile = nil
+        profileLoaded = false
+        restoreFailed = false
+        // Meals are not saved per account yet, so they must not carry over to whoever signs in next.
+        logs = [:]
+        calorieHistory = [:]
+        recommendations = .idle
+        answeredRequest = nil
+        overlays.removeAll()
+        page = .dashboard
+    }
+
+    private func start(_ account: Account, profile: UserProfile?) {
+        self.account = account
+        self.profile = profile
+        profileLoaded = true
+        restoreFailed = false
+    }
 
     // MARK: Derived state
 
@@ -157,6 +277,78 @@ final class AppModel {
             earlier: earlier.filter(canView),
             hiddenCount: (now + earlier).filter { !canView($0) }.count
         )
+    }
+
+    // MARK: Meal ideas
+
+    /// True while no key is configured and meal ideas are canned, not matched to the person.
+    var usesSampleRecommendations: Bool { recommendationSource == .sample }
+
+    var recommendationSource: RecommendationSource {
+        if mealRecommender is SampleMealRecommender { return .sample }
+        return mealRecommender is GeminiMealRecommender ? .ai : .recipeDatabase
+    }
+
+    /// The recipe database when it has a key, then Gemini, then canned samples.
+    private static func configuredRecommender() -> MealRecommending {
+        if let database = SpoonacularMealRecommender.fromConfig() { return database }
+        if let gemini = GeminiMealRecommender.fromConfig() { return gemini }
+        return SampleMealRecommender()
+    }
+
+    /// What a meal idea must fit right now. Nil once today's calories are all but used.
+    var mealRequest: MealRequest? {
+        guard let budget = Nutrition.mealBudget(remainingKcal: remainingKcal, targetKcal: targets.kcal) else { return nil }
+        return MealRequest(
+            budget: budget,
+            remainingProtein: max(0, targets.protein - consumed.protein),
+            slot: .suggested(atHour: Calendar.current.component(.hour, from: now())),
+            goal: profile?.goal,
+            diet: profile?.dietList ?? []
+        )
+    }
+
+    /// Fetches meal ideas for the current request. Does nothing if the ideas on show already answer it,
+    /// unless `force` asks for different ones.
+    @MainActor
+    func refreshRecommendations(force: Bool = false) async {
+        guard let request = mealRequest else {
+            recommendations = .budgetUsed
+            answeredRequest = nil
+            return
+        }
+        guard force || request != answeredRequest else { return }
+        var shown: [String] = []
+        if force, case .loaded(let meals) = recommendations { shown = meals.map(\.name) }
+        recommendations = .loading
+        answeredRequest = request
+        do {
+            let meals = try await mealRecommender.recommend(request, avoiding: shown)
+            // A newer request took over while this one was in flight.
+            guard answeredRequest == request else { return }
+            recommendations = .loaded(Self.fitting(meals, request: request))
+        } catch {
+            guard answeredRequest == request else { return }
+            answeredRequest = nil
+            if case GeminiClient.ClientError.badResponse(GeminiClient.quotaStatus) = error {
+                recommendations = .limitReached
+            } else if error as? MealRecommendationError == .limitReached {
+                recommendations = .limitReached
+            } else {
+                recommendations = .failed
+            }
+        }
+    }
+
+    /// The request is enforced here, whatever the recommender returned: nothing over budget, nothing whose
+    /// name breaks the diet, no repeats, four at most.
+    private static func fitting(_ meals: [MealRecommendation], request: MealRequest) -> [MealRecommendation] {
+        var seen: Set<String> = []
+        return Array(meals.filter {
+            $0.kcal > 0 && $0.kcal <= request.budget && DietScreen.passes(request.diet, texts: [$0.name])
+                && seen.insert($0.name.lowercased()).inserted
+        }
+        .prefix(GeminiMealRecommender.count))
     }
 
     // MARK: Sheets

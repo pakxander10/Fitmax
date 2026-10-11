@@ -3,33 +3,39 @@ import SwiftUI
 struct ProfileSheet: View {
     @Environment(AppModel.self) private var model
 
-    private static let biometrics = [
-        ("178", "Height cm"), ("74.5", "Weight kg"), ("38.2", "Neck cm"),
-        ("99.0", "Chest cm"), ("82.5", "Waist cm"), ("97.0", "Hips cm"),
-    ]
+    // Previews and render tests have nobody signed in, so they show the sample person.
+    private var account: Account { model.account ?? SampleData.account }
+    private var profile: UserProfile { model.profile ?? SampleData.profile }
+
+    /// Height and weight come from onboarding; the rest wait for a body scan.
+    private var biometrics: [(String, String)] {
+        [
+            (profile.heightText, "Height"), (profile.weightText, "Weight lb"), ("–", "Neck in"),
+            ("–", "Chest in"), ("–", "Waist in"), ("–", "Hips in"),
+        ]
+    }
 
     private var facts: [(String, String)] {
         let targets = model.targets
         return [
-            ("Goal", "Lean bulk · 4 days a week"),
-            ("Experience", "Intermediate"),
-            ("Injuries", "Left shoulder: avoid overhead barbell work"),
-            ("Equipment", "Full gym · barbell, dumbbells, cables"),
-            ("Diet", "Peanut allergy"),
-            ("Targets", "\(targets.kcal) kcal · P \(targets.protein) · C \(targets.carbs) · F \(targets.fat) g"),
+            ("Goal", profile.goalSummary),
+            ("Experience", profile.experience.label),
+            ("Injuries", profile.injurySummary),
+            ("Equipment", profile.equipmentSummary),
+            ("Diet", profile.dietSummary),
+            ("Targets", "\(targets.kcal) kcal a day · estimate\nP \(targets.protein) · C \(targets.carbs) · F \(targets.fat) g"),
         ]
     }
 
     var body: some View {
         @Bindable var model = model
         let game = model.game
-        let scanned = model.today.adding(-7)
         FQOverlay(title: "Profile", onBack: model.dismiss) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 16) {
-                    FQAvatar(initials: "A", size: 72)
+                    FQAvatar(initials: account.initials, size: 72)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Alex Moreno").heading(24)
+                        Text(account.name).heading(24).lineLimit(2).minimumScaleFactor(0.7)
                         Text("Pet level \(game.level) · \(game.xp.formatted(.number.grouping(.automatic))) XP").caption(13)
                         Label(
                             model.hidesProfileFromNonFriends ? "Visible to friends only" : "Visible to everyone at your gym",
@@ -42,14 +48,13 @@ struct ProfileSheet: View {
                 .aeroCard()
 
                 VStack(alignment: .leading, spacing: 12) {
-                    CardTitle(title: "Biometrics · estimate", trailing: "Scanned \(scanned.dayOfMonth) \(scanned.monthShort)")
+                    CardTitle(title: "Biometrics", trailing: "No scan yet")
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
-                        ForEach(Self.biometrics, id: \.1) { SpecCell(value: $0.0, label: $0.1) }
+                        ForEach(biometrics, id: \.1) { SpecCell(value: $0.0, label: $0.1) }
                     }
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text("16.4%").heading(28)
-                        Text("Body fat · Navy method · ±4 pts").caption()
-                    }
+                    Text("Measurements and a body-fat estimate appear here after your first scan.")
+                        .caption()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .aeroCard()
 
@@ -78,10 +83,16 @@ struct ProfileSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 12) {
                         FQButton(title: "New scan") { model.flash("Scan · coming soon") }
-                        FQButton(title: "Edit", variant: .secondary) { model.flash("Edit profile · coming soon") }
+                        FQButton(title: "Edit", variant: .secondary) { model.present(.editProfile) }
                     }
                     Text("All body measurements are estimates from photos. Trends matter more than single readings. This app is not medical advice.")
                         .copy(13, color: Theme.muted)
+                }
+                .aeroCard()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Signed in as \(account.email)").copy(14)
+                    FQButton(title: "Sign out", variant: .secondary, action: model.signOut)
                 }
                 .aeroCard()
             }

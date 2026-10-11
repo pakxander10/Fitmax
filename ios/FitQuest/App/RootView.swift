@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Four swipeable pages under a dot nav, with sheets, scrims and the toast layered above.
+/// Login, then onboarding, then the app itself: four swipeable pages under a dot nav, with
+/// sheets, scrims and the toast layered above.
 struct RootView: View {
     @State private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
@@ -18,6 +19,30 @@ struct RootView: View {
     var body: some View {
         ZStack {
             AeroBackground()
+            switch model.stage {
+            case .launching: LaunchScreen().transition(.opacity)
+            case .signedOut: AuthScreen().transition(.opacity)
+            case .onboarding: OnboardingFlow().transition(.opacity)
+            case .ready: app.transition(.opacity)
+            }
+        }
+        .overlay(alignment: .top) { toast }
+        .animation(.easeOut(duration: 0.25), value: model.stage)
+        .animation(.easeOut(duration: 0.2), value: model.overlays)
+        .animation(.easeOut(duration: 0.2), value: model.toast)
+        .environment(model)
+        .preferredColorScheme(.light)
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
+        .onChange(of: model.page) { UserDefaults.standard.set(model.page.rawValue, forKey: Self.pageKey) }
+        .onChange(of: scenePhase) {
+            // Roll "today" over if the app sat in the background past midnight.
+            if scenePhase == .active { model.today = Day() }
+        }
+        .task { await model.restoreSession() }
+    }
+
+    private var app: some View {
+        ZStack {
             Group {
                 pager
                 NavBar()
@@ -29,17 +54,6 @@ struct RootView: View {
                     .accessibilityHidden(index != model.overlays.count - 1)
                     .transition(.opacity)
             }
-        }
-        .overlay(alignment: .top) { toast }
-        .animation(.easeOut(duration: 0.2), value: model.overlays)
-        .animation(.easeOut(duration: 0.2), value: model.toast)
-        .environment(model)
-        .preferredColorScheme(.light)
-        .dynamicTypeSize(...DynamicTypeSize.xLarge)
-        .onChange(of: model.page) { UserDefaults.standard.set(model.page.rawValue, forKey: Self.pageKey) }
-        .onChange(of: scenePhase) {
-            // Roll "today" over if the app sat in the background past midnight.
-            if scenePhase == .active { model.today = Day() }
         }
     }
 
@@ -79,6 +93,7 @@ struct RootView: View {
         case .meal(let meal, let day): MealDetail(meal: meal, day: day)
         case .logMeal: LogMealFlow()
         case .profile: ProfileSheet()
+        case .editProfile: OnboardingFlow(editing: true, draft: model.profile.map(ProfileDraft.init) ?? ProfileDraft())
         case .pet: PetSheet()
         case .member(let member): MemberProfile(member: member)
         case .addFriend: AddFriendSheet()

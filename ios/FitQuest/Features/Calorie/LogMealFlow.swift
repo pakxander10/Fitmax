@@ -235,7 +235,11 @@ struct LogMealFlow: View {
             do {
                 found = try await model.foodAnalyzer.estimate(input)
             } catch {
-                notice = "Couldn't analyse that — check your connection and try again."
+                if case GeminiClient.ClientError.badResponse(GeminiClient.quotaStatus) = error {
+                    notice = "The Gemini key has used up its requests for now. Try again later."
+                } else {
+                    notice = "Couldn't analyse that — check your connection and try again."
+                }
                 step = .capture
                 return
             }

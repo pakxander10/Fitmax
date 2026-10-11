@@ -5,6 +5,16 @@ enum MealSlot: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
+
+    /// The meal someone is most likely to be planning at this hour (0 to 23).
+    static func suggested(atHour hour: Int) -> MealSlot {
+        switch hour {
+        case 5..<11: .breakfast
+        case 11..<16: .lunch
+        case 16..<22: .dinner
+        default: .snack
+        }
+    }
 }
 
 enum MealSource: Equatable {
@@ -98,13 +108,45 @@ struct FoodItem: Identifiable, Equatable {
     }
 }
 
-struct MealRecommendation: Identifiable {
+/// One meal idea. Calories and protein are estimates for a single serving.
+struct MealRecommendation: Identifiable, Equatable {
     var id: String { name }
     let name: String
     let kcal: Int
     let protein: Int
-    let place: String
-    let distance: String
+    /// A recipe page that was opened and confirmed to be this dish. Nil when none checked out.
+    let link: URL?
+}
+
+/// What a meal idea has to fit. Built in code from the day's numbers and the profile.
+struct MealRequest: Equatable {
+    /// The most one meal may cost, in kcal.
+    var budget: Int
+    var remainingProtein: Int
+    var slot: MealSlot
+    var goal: UserProfile.Goal?
+    var diet: [UserProfile.Diet]
+}
+
+enum MealRecommendationError: Error, Equatable {
+    /// The service's free allowance is used up for now.
+    case limitReached
+    case badResponse(Int)
+}
+
+/// Suggests meals for a request. `avoiding` names ideas already shown, when the person asks for new ones.
+protocol MealRecommending {
+    func recommend(_ request: MealRequest, avoiding: [String]) async throws -> [MealRecommendation]
+}
+
+/// Canned ideas for when no Gemini key is configured. They ignore the request entirely.
+struct SampleMealRecommender: MealRecommending {
+    var delay: Duration = .milliseconds(600)
+
+    func recommend(_ request: MealRequest, avoiding: [String]) async throws -> [MealRecommendation] {
+        try await Task.sleep(for: delay)
+        return SampleData.recommendations
+    }
 }
 
 enum FoodInput: Equatable {

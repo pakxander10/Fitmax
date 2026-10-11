@@ -7,22 +7,26 @@ import XCTest
 /// Opt-in: `FQ_RENDER_DIR=/some/dir swift test --filter RenderTests`
 final class RenderTests: XCTestCase {
     @MainActor
-    func testRenderScreens() throws {
+    func testRenderScreens() async throws {
         guard let dir = ProcessInfo.processInfo.environment["FQ_RENDER_DIR"] else {
             throw XCTSkip("Set FQ_RENDER_DIR to render screens")
         }
         let out = URL(fileURLWithPath: dir, isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
-        let model = AppModel(today: Day(key: "2026-10-10"))
+        let model = AppModel(today: Day(key: "2026-10-10"), sampleMeals: true)
         let meal = try XCTUnwrap(model.logs[model.today]?[1])
         let friend = SampleData.members[1]
         let song = try XCTUnwrap(SampleData.songs["ram"]?.first)
         let bench = try XCTUnwrap(model.activeTemplate?.exercises.first)
         model.toggleSet(0, of: bench)
+        model.mealRecommender = SampleMealRecommender(delay: .zero)
+        await model.refreshRecommendations()
+        let draft = ProfileDraft(SampleData.profile)
 
         let screens: [(String, AnyView)] = [
             ("01-calorie", AnyView(PageScroll { CaloriePage() })),
+            ("25-calorie-empty", AnyView(PageScroll { CaloriePage() }.environment(AppModel(today: Day(key: "2026-10-10"))))),
             ("02-dashboard", AnyView(PageScroll { DashboardPage() })),
             ("03-workout", AnyView(PageScroll { WorkoutPage() })),
             ("04-gym", AnyView(PageScroll { GymPage() })),
@@ -39,6 +43,14 @@ final class RenderTests: XCTestCase {
             ("14-template", AnyView(TemplateDetail(templateID: "push"))),
             ("12-about-exercise", AnyView(AboutExerciseCard(exercise: bench))),
             ("13-nav", AnyView(NavBar().frame(height: 140))),
+            ("18-sign-in", AnyView(AuthScreen())),
+            ("19-sign-up", AnyView(AuthScreen(mode: .signUp))),
+            ("20-onboarding-body", AnyView(OnboardingFlow(draft: draft))),
+            ("21-onboarding-goal", AnyView(OnboardingFlow(step: .goal, draft: draft))),
+            ("22-onboarding-training", AnyView(OnboardingFlow(step: .training, draft: draft))),
+            ("26-onboarding-diet", AnyView(OnboardingFlow(step: .diet, draft: draft))),
+            ("23-onboarding-targets", AnyView(OnboardingFlow(step: .targets, draft: draft))),
+            ("24-launch", AnyView(LaunchScreen().frame(height: 400))),
         ]
 
         for (name, view) in screens {

@@ -10,7 +10,7 @@ struct DashboardPage: View {
             HStack(alignment: .top) {
                 FQHead(index: "Dashboard", title: model.today.weekdayName)
                 Spacer()
-                Button { model.present(.profile) } label: { FQAvatar(initials: "A", size: 46) }
+                Button { model.present(.profile) } label: { FQAvatar(initials: (model.account ?? SampleData.account).initials, size: 46) }
                     .buttonStyle(PressStyle())
                     .accessibilityLabel("Profile")
             }

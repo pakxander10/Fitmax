@@ -1,53 +1,32 @@
 import Foundation
 
-/// Estimates foods from a meal photo or typed description with the Gemini API.
-///
-/// The key ships inside the app bundle, so this is for demos only. For release, point `endpoint`
-/// at a backend that holds the key (the `/v1/food/*` seam this protocol was written for).
+/// Estimates foods from a meal photo or typed description by calling the Gemini API directly.
+/// Legacy: the app uses `FirebaseFoodAnalyzer` when Firebase is configured, and this only as a fallback.
 struct GeminiFoodAnalyzer: FoodAnalyzing {
-    enum AnalyzerError: Error { case badResponse(Int), noContent }
+    typealias AnalyzerError = GeminiClient.ClientError
 
+    /// The one place the Gemini model is named. The Firebase analyzer and the REST client both read it.
     static let defaultModel = "gemini-3.8-flash"
+    /// Tried in order by the REST client when `defaultModel` is out of quota: the free tier counts each model separately.
+    static let fallbackModels = ["gemini-3.7-flash", "gemini-3.6-flash"]
 
-    var apiKey: String
-    var model = defaultModel
-    var session: URLSession = .shared
-    /// Wait before the first retry; the second waits twice as long.
-    var retryDelay: Duration = .milliseconds(800)
+    var client: GeminiClient
 
-    private static let maxAttempts = 3
-    /// Statuses that mean "busy, try again", not "your request is wrong".
-    private static let transientStatuses: Set<Int> = [429, 500, 502, 503, 504]
+    init(client: GeminiClient) {
+        self.client = client
+    }
 
-    /// Reads `GEMINI_API_KEY` from the environment, then from a gitignored `Secrets.plist` in the bundle.
+    init(apiKey: String, session: URLSession = .shared, retryDelay: Duration = .milliseconds(800)) {
+        client = GeminiClient(apiKey: apiKey, session: session, retryDelay: retryDelay)
+    }
+
+    /// Nil when no Gemini key is configured.
     static func fromConfig(bundle: Bundle = .main) -> GeminiFoodAnalyzer? {
-        var key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"]
-        if key?.isEmpty != false,
-           let url = bundle.url(forResource: "Secrets", withExtension: "plist"),
-           let dict = NSDictionary(contentsOf: url) {
-            key = dict["GEMINI_API_KEY"] as? String
-        }
-        guard let key, !key.isEmpty, key != "paste-your-key-here" else { return nil }
-        return GeminiFoodAnalyzer(apiKey: key)
+        GeminiClient.fromConfig(bundle: bundle).map(GeminiFoodAnalyzer.init(client:))
     }
 
     func estimate(_ input: FoodInput) async throws -> [FoodItem] {
-        var request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 45
-        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: Self.body(for: input))
-
-        var status = 0
-        for attempt in 0..<Self.maxAttempts {
-            if attempt > 0 { try await Task.sleep(for: retryDelay * attempt) }
-            let (data, response) = try await session.data(for: request)
-            status = (response as? HTTPURLResponse)?.statusCode ?? 200
-            if status == 200 { return try Self.parse(data) }
-            guard Self.transientStatuses.contains(status) else { break }
-        }
-        throw AnalyzerError.badResponse(status)
+        try Self.parse(try await client.send(Self.body(for: input)))
     }
 
     // MARK: Request
@@ -111,17 +90,6 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
 
     // MARK: Response
 
-    private struct Envelope: Decodable {
-        struct Candidate: Decodable {
-            struct Content: Decodable {
-                struct Part: Decodable { var text: String? }
-                var parts: [Part]?
-            }
-            var content: Content?
-        }
-        var candidates: [Candidate]?
-    }
-
     private struct Payload: Decodable {
         struct Item: Decodable {
             var name: String
@@ -145,10 +113,7 @@ struct GeminiFoodAnalyzer: FoodAnalyzing {
     }
 
     static func parse(_ data: Data) throws -> [FoodItem] {
-        let envelope = try JSONDecoder().decode(Envelope.self, from: data)
-        guard let text = envelope.candidates?.first?.content?.parts?.compactMap(\.text).joined(),
-              !text.isEmpty else { throw AnalyzerError.noContent }
-        return try items(fromJSON: text)
+        try items(fromJSON: try GeminiClient.text(from: data))
     }
 
     /// Validates Gemini's `{"items": [...]}` JSON text and turns it into foods, dropping empty portions.
