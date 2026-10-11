@@ -17,10 +17,7 @@ struct SongListenersSheet: View {
                         Text("\(audience.total) listeners at \(model.gym.shortName) this week").caption()
                     }
                     Spacer(minLength: 0)
-                    if let url = song.spotifyURL {
-                        Link(destination: url) { FQIconGlyph(symbol: "play.fill") }
-                            .accessibilityLabel("Play \(song.title) on Spotify")
-                    }
+                    PlayButton(song: song)
                 }
                 .aeroCard()
 

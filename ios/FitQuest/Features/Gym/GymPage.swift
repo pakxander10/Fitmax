@@ -176,10 +176,31 @@ private struct SongRow: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Number \(position), \(song.title) by \(song.artist), \(audience.total) listeners")
             .accessibilityHint("Shows everyone listening")
-            if let url = song.spotifyURL {
-                Link(destination: url) { FQIconGlyph(symbol: "play.fill") }
-                    .accessibilityLabel("Play \(song.title) on Spotify")
+            PlayButton(song: song)
+        }
+    }
+}
+
+/// Opens a song in Spotify. If the system refuses to open the link, as it did on device
+/// ("Failed to open URL", LaunchServices error 115), the page opens in the in-app browser instead.
+struct PlayButton: View {
+    let song: Song
+
+    @Environment(\.openURL) private var openURL
+    @State private var page: URL?
+
+    var body: some View {
+        if let url = song.spotifyURL {
+            Button {
+                openURL(url) { opened in
+                    if !opened { page = url }
+                }
+            } label: {
+                FQIconGlyph(symbol: "play.fill")
             }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Play \(song.title) on Spotify")
+            .webSheet($page)
         }
     }
 }
