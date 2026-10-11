@@ -3,6 +3,9 @@ import SwiftUI
 struct CaloriePage: View {
     @Environment(AppModel.self) private var model
 
+    /// The recipe page open in the in-app browser, if any.
+    @State private var openPage: URL?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             FQHead(index: "Calorie", title: "Recommended meals", meta: meta)
@@ -23,6 +26,7 @@ struct CaloriePage: View {
             }
             ForEach(model.loggedDays, id: \.self) { DayLog(day: $0) }
         }
+        .webSheet($openPage)
     }
 }
 
@@ -52,7 +56,7 @@ extension CaloriePage {
             note("Nothing fits right now", "No idea came in under your budget.", button: "Try again")
         case .loaded(let meals):
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(meals) { RecommendationRow(recommendation: $0) }
+                ForEach(meals) { RecommendationRow(recommendation: $0) { openPage = $0 } }
                 VStack(alignment: .leading, spacing: 8) {
                     if model.usesSampleRecommendations {
                         Label("Sample ideas, not matched to your diet. Add a Spoonacular key to Secrets.plist and rebuild for real ones.", systemImage: "exclamationmark.triangle.fill")
@@ -108,6 +112,7 @@ private struct IdeasTrigger: Equatable {
 
 private struct RecommendationRow: View {
     let recommendation: MealRecommendation
+    let open: (URL) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -118,10 +123,10 @@ private struct RecommendationRow: View {
             }
             FlowLayout(spacing: 14, lineSpacing: 4) {
                 if let link = recommendation.link {
-                    Link(destination: link) { Text("Recipe on \(Self.site(link)) ›").caption(13, color: Theme.link) }
+                    pageButton("Recipe on \(Self.site(link)) ›", link)
                 } else if let search = Self.searchURL("\(recommendation.name) recipe") {
                     // No link checked out for this one, so offer a search instead of a guess.
-                    Link(destination: search) { Text("Search for a recipe ›").caption(13, color: Theme.link) }
+                    pageButton("Search for a recipe ›", search)
                 }
                 Text("\(recommendation.protein) g protein").caption(13)
             }
@@ -129,6 +134,14 @@ private struct RecommendationRow: View {
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .bottom) { Hairline() }
+    }
+
+    private func pageButton(_ title: String, _ url: URL) -> some View {
+        Button { open(url) } label: {
+            Text(title).caption(13, color: Theme.link).frame(minHeight: 30).contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityAddTraits(.isLink)
     }
 
     private static func searchURL(_ query: String) -> URL? {
