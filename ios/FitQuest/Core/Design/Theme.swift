@@ -5,10 +5,12 @@ import SwiftUI
 enum Theme {
     // MARK: Sky
 
-    static let skyTop = Color(hex: 0x0E78DA)
-    static let skyMid = Color(hex: 0x38B2F4)
-    static let skyLow = Color(hex: 0x9CE6F4)
-    static let meadow = Color(hex: 0xC9F6C6)
+    // Deep azure at the top so white titles hold their contrast, easing to aqua at the bottom.
+    static let skyTop = Color(hex: 0x073A86)
+    static let skyMid = Color(hex: 0x0F6CC8)
+    static let skyLow = Color(hex: 0x2DA6E4)
+    /// The bottom of the sky; the tab bar's fade blends into it.
+    static let horizon = Color(hex: 0x7FDCEB)
 
     // MARK: Text
 

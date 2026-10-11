@@ -1,12 +1,9 @@
 import SwiftUI
 
-/// Biscuit walking the yard, with a thought bubble showing a fresh emoji for the current mood.
+/// Biscuit walking the yard.
 struct PetPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    @State private var emoji = ""
-    @State private var bubbleShown = true
 
     /// Seconds for one trip across the yard and back.
     private static let lap: Double = 16
@@ -33,8 +30,6 @@ struct PetPanel: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Biscuit is feeling \(model.mood.rawValue). Pet level \(game.level), \(game.xpToNextLevel) XP to the next level, \(game.streakDays) day streak.")
         .accessibilityAddTraits(.isButton)
-        .task { await cycleBubble() }
-        .onChange(of: model.mood) { emoji = model.mood.randomEmoji() }
     }
 
     private var yard: some View {
@@ -50,37 +45,10 @@ struct PetPanel: View {
                         DogView(stride: reduceMotion ? 0 : time * 8)
                             .scaleEffect(x: outbound ? 1 : -1, y: 1)
                             .offset(x: x)
-                        bubble
-                            .offset(x: x + (outbound ? 62 : 6), y: -(DogView.size.height - 14))
-                            .opacity(bubbleShown ? 1 : 0)
-                            .animation(.easeOut(duration: 0.25), value: bubbleShown)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 }
             }
-        }
-    }
-
-    private var bubble: some View {
-        Text(emoji.isEmpty ? model.mood.emojis[0] : emoji)
-            .font(.system(size: 20))
-            .frame(width: 38, height: 38)
-            .background(Circle().fill(.white).shadow(color: Theme.azure.opacity(0.3), radius: 4, y: 2))
-            .overlay(Circle().strokeBorder(Theme.aqua.opacity(0.5), lineWidth: 1))
-            .overlay(alignment: .bottomLeading) {
-                Circle().fill(.white).frame(width: 8, height: 8).offset(x: -2, y: 5)
-            }
-    }
-
-    /// Shows a face for a few seconds, hides it, then comes back with a different one.
-    private func cycleBubble() async {
-        emoji = model.mood.randomEmoji()
-        while !Task.isCancelled {
-            bubbleShown = true
-            try? await Task.sleep(for: .seconds(4))
-            bubbleShown = false
-            try? await Task.sleep(for: .seconds(2))
-            emoji = model.mood.randomEmoji(excluding: emoji)
         }
     }
 }

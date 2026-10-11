@@ -190,9 +190,9 @@ struct NavBar: View {
                 Color.clear
                 LinearGradient(
                     stops: [
-                        .init(color: Theme.meadow, location: 0),
-                        .init(color: Theme.meadow.opacity(0.9), location: 0.45),
-                        .init(color: Theme.meadow.opacity(0), location: 1),
+                        .init(color: Theme.horizon, location: 0),
+                        .init(color: Theme.horizon.opacity(0.9), location: 0.45),
+                        .init(color: Theme.horizon.opacity(0), location: 1),
                     ],
                     startPoint: .bottom, endPoint: .top
                 )

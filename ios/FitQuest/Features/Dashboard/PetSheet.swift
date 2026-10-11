@@ -4,8 +4,6 @@ struct PetSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var emoji = ""
-
     private static let shop: [(name: String, kind: String, cost: Int, owned: Bool)] = [
         ("Molsheim garage", "Background", 200, true),
         ("Night track", "Background", 350, false),
@@ -22,7 +20,6 @@ struct PetSheet: View {
 
     var body: some View {
         let game = model.game
-        let face = emoji.isEmpty ? model.mood.emojis[0] : emoji
         FQOverlay(title: "Biscuit", onBack: model.dismiss) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -34,7 +31,7 @@ struct PetSheet: View {
                         }
                     }
                     HStack(alignment: .top, spacing: 8) {
-                        SpecCell(value: face, label: "Mood · \(model.mood.rawValue)")
+                        SpecCell(value: model.mood.rawValue.capitalized, label: "Mood")
                         SpecCell(value: "\(game.level)", label: "Pet level")
                         SpecCell(value: "\(model.points)", label: "Points")
                     }
@@ -80,6 +77,5 @@ struct PetSheet: View {
                 .aeroCard(vertical: 4)
             }
         }
-        .onAppear { emoji = model.mood.randomEmoji() }
     }
 }
