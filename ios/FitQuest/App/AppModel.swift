@@ -25,6 +25,7 @@ final class AppModel {
         case logMeal
         case profile
         case editProfile
+        case bodyScan
         case pet
         case member(Member)
         case addFriend
@@ -78,6 +79,8 @@ final class AppModel {
 
     private(set) var account: Account?
     private(set) var profile: UserProfile?
+    /// The latest saved body scan. Every number in it is an estimate.
+    private(set) var biometrics: Biometrics?
     /// The last attempt to load the profile failed; the launch screen offers a retry.
     private(set) var restoreFailed = false
     private var profileLoaded = false
@@ -98,8 +101,11 @@ final class AppModel {
     @ObservationIgnored var mealRecommender: MealRecommending = AppModel.configuredRecommender()
     /// The clock, replaceable in tests.
     @ObservationIgnored var now: () -> Date = { Date() }
+    /// Nil when this build has no scan server set up; the scan screen then says so.
+    @ObservationIgnored var bodyScanner: BodyScanning?
     @ObservationIgnored private let auth: AuthProviding
     @ObservationIgnored private let profiles: ProfileStoring
+    @ObservationIgnored private let biometricsStore: BiometricsStoring
 
     private var progressByExercise: [String: ExerciseProgress] = [:]
     private var rewardedTemplates: Set<String> = []
@@ -112,12 +118,14 @@ final class AppModel {
     init(
         today: Day = Day(), page: Page = .dashboard,
         auth: AuthProviding = LocalAuthService(), profiles: ProfileStoring = LocalProfileStore(),
+        biometricsStore: BiometricsStoring = LocalBiometricsStore(),
         sampleMeals: Bool = false
     ) {
         self.today = today
         self.page = page
         self.auth = auth
         self.profiles = profiles
+        self.biometricsStore = biometricsStore
         account = auth.currentAccount
         // A real account starts with an empty food log. The sample one is for previews and tests.
         logs = sampleMeals ? SampleData.logs(today: today) : [:]
@@ -179,6 +187,7 @@ final class AppModel {
         try? auth.signOut()
         account = nil
         profile = nil
+        biometrics = nil
         profileLoaded = false
         restoreFailed = false
         // Meals are not saved per account yet, so they must not carry over to whoever signs in next.
@@ -195,6 +204,39 @@ final class AppModel {
         self.profile = profile
         profileLoaded = true
         restoreFailed = false
+    }
+
+    // MARK: Body scan
+
+    /// Loads the latest saved scan for whoever is signed in. A failed load leaves the card
+    /// empty instead of blocking the profile; the next save overwrites it anyway.
+    @MainActor
+    func loadBiometrics() async {
+        guard let account else { return }
+        do {
+            biometrics = try await biometricsStore.latest(for: account.id)
+        } catch {
+            biometrics = nil
+        }
+    }
+
+    /// Sends one photo to the scan server. Height, weight and sex come from the profile.
+    func scanBody(_ photo: Data) async throws -> Biometrics {
+        guard let bodyScanner else { throw ScanError.notConfigured }
+        guard let profile else { throw ScanError.notSignedIn }
+        return try await bodyScanner.scan(
+            ScanRequest(photo: photo, heightCm: profile.heightCm, weightKg: profile.weightKg, sex: profile.sex)
+        )
+    }
+
+    /// Keeps the reviewed numbers (never the photo) and returns to the profile.
+    @MainActor
+    func saveBiometrics(_ scan: Biometrics) async throws {
+        guard let account else { throw NotSignedIn() }
+        try await biometricsStore.save(scan, for: account.id)
+        biometrics = scan
+        overlays.removeAll { $0 == .bodyScan }
+        flash("Scan saved · estimates")
     }
 
     // MARK: Derived state
