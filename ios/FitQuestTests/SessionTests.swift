@@ -25,7 +25,7 @@ final class SessionTests: XCTestCase {
             today: Day(key: today),
             auth: LocalAuthService(defaults: defaults),
             profiles: profiles ?? LocalProfileStore(defaults: defaults),
-            mealStore: LocalMealStore(defaults: defaults)
+            mealStore: LocalMealStore(defaults: defaults), progressStore: LocalProgressStore(defaults: defaults)
         )
     }
 

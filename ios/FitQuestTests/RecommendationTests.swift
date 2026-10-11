@@ -25,7 +25,7 @@ final class RecommendationTests: XCTestCase {
         let model = AppModel(
             today: Day(key: "2026-10-10"),
             auth: LocalAuthService(defaults: defaults), profiles: LocalProfileStore(defaults: defaults),
-            mealStore: LocalMealStore(defaults: defaults)
+            mealStore: LocalMealStore(defaults: defaults), progressStore: LocalProgressStore(defaults: defaults)
         )
         model.mealRecommender = recommender
         model.now = { Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 18))! }

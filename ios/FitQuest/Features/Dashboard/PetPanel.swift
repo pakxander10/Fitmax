@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Biscuit walking the yard.
+/// The pet walking the yard.
 struct PetPanel: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -12,7 +12,7 @@ struct PetPanel: View {
         let game = model.game
         Button { model.present(.pet) } label: {
             VStack(spacing: 12) {
-                CardTitle(title: "Biscuit", trailing: "\(game.streakDays)-day streak")
+                CardTitle(title: model.petName, trailing: "\(game.streakDays)-day streak")
                 yard
                 VStack(spacing: 6) {
                     HStack {
@@ -28,7 +28,7 @@ struct PetPanel: View {
         }
         .buttonStyle(PressStyle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Biscuit is feeling \(model.mood.rawValue). Pet level \(game.level), \(game.xpToNextLevel) XP to the next level, \(game.streakDays) day streak.")
+        .accessibilityLabel("\(model.petName) is feeling \(model.mood.rawValue). Pet level \(game.level), \(game.xpToNextLevel) XP to the next level, \(game.streakDays) day streak.")
         .accessibilityAddTraits(.isButton)
     }
 

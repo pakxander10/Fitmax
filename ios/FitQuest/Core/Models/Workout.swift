@@ -46,7 +46,7 @@ struct ExerciseProgress: Equatable {
 }
 
 /// One finished workout, as shown in a template's history.
-struct WorkoutSession: Identifiable, Equatable {
+struct WorkoutSession: Identifiable, Equatable, Codable {
     let id: String
     let templateID: String
     let day: Day

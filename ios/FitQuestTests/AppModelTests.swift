@@ -3,7 +3,7 @@ import XCTest
 
 final class AppModelTests: XCTestCase {
     private let today = Day(key: "2026-10-10")
-    private func makeModel() -> AppModel { AppModel(today: today, sampleMeals: true) }
+    private func makeModel() -> AppModel { AppModel(today: today, sampleData: true) }
 
     // MARK: Calories
 

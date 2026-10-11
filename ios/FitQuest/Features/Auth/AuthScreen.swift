@@ -163,7 +163,7 @@ struct BrandHeader: View {
                 .scaleEffect(1.25)
                 .frame(height: DogView.size.height * 1.25)
                 .accessibilityHidden(true)
-            Text("FitQuest").heading(40, color: Theme.onSky).accessibilityAddTraits(.isHeader)
+            Text("FitMax").heading(40, color: Theme.onSky).accessibilityAddTraits(.isHeader)
             Text("Eat well, train, and raise your pet.").copy(16, color: Theme.onSky.opacity(0.95))
         }
         .skyShadow()

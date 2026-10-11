@@ -34,6 +34,7 @@ struct ProfileSheet: View {
             ("Injuries", profile.injurySummary),
             ("Equipment", profile.equipmentSummary),
             ("Diet", profile.dietSummary),
+            ("Pet", profile.petName),
             ("Targets", "\(targets.kcal) kcal a day · estimate\nP \(targets.protein) · C \(targets.carbs) · F \(targets.fat) g"),
         ]
     }

@@ -105,7 +105,7 @@ struct ExerciseDetail: View {
                 }
                 HStack(alignment: .top, spacing: 8) {
                     SpecCell(value: progress.volume.formatted(.number.grouping(.automatic)), label: "Volume · lb")
-                    SpecCell(value: exercise.lastRecord, label: "Last record")
+                    SpecCell(value: model.lastRecord(for: exercise), label: "Last record")
                 }
             }
             .aeroCard()

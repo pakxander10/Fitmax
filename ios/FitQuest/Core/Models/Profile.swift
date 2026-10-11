@@ -115,6 +115,10 @@ struct UserProfile: Equatable, Codable {
         }
     }
 
+    static let defaultPetName = "Biscuit"
+    /// Long enough for a name, short enough for the pet's card title.
+    static let maxPetNameLength = 20
+
     static let ageRange = 13...100
     static let daysRange = 1...7
     static let cmPerInch = 2.54
@@ -130,11 +134,12 @@ struct UserProfile: Equatable, Codable {
     var injuries: Set<Injury>
     var equipment: Set<Equipment>
     var diet: Set<Diet> = []
+    var petName = UserProfile.defaultPetName
 
     enum CodingKeys: String, CodingKey {
         case sex, age, goal, experience, injuries, equipment
         case heightCm = "height_cm", weightKg = "weight_kg", daysPerWeek = "days_per_week"
-        case diet = "dietary_restrictions"
+        case diet = "dietary_restrictions", petName = "pet_name"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -150,6 +155,7 @@ struct UserProfile: Equatable, Codable {
         try container.encode(Injury.allCases.filter(injuries.contains), forKey: .injuries)
         try container.encode(Equipment.allCases.filter(equipment.contains), forKey: .equipment)
         try container.encode(dietList, forKey: .diet)
+        try container.encode(petName, forKey: .petName)
     }
 
     /// The restrictions in a fixed order.
@@ -197,6 +203,8 @@ extension UserProfile {
         equipment = try container.decode(Set<Equipment>.self, forKey: .equipment)
         // Absent from profiles saved before onboarding asked about diet.
         diet = try container.decodeIfPresent(Set<Diet>.self, forKey: .diet) ?? []
+        // Absent from profiles saved before pets could be named.
+        petName = try container.decodeIfPresent(String.self, forKey: .petName) ?? UserProfile.defaultPetName
     }
 }
 
@@ -219,6 +227,8 @@ struct ProfileDraft: Equatable {
     var injuries: Set<UserProfile.Injury> = []
     var equipment: Set<UserProfile.Equipment> = []
     var diet: Set<UserProfile.Diet> = []
+    /// Blank keeps the default name.
+    var petName = ""
 
     init() {}
 
@@ -238,6 +248,7 @@ struct ProfileDraft: Equatable {
         injuries = profile.injuries
         equipment = profile.equipment
         diet = profile.diet
+        petName = profile.petName
     }
 
     /// The first thing wrong with the "about you" step, top of the form first. Nil when it is complete.
@@ -264,7 +275,7 @@ struct ProfileDraft: Equatable {
             sex: sex, age: age, heightCm: inches * UserProfile.cmPerInch, weightKg: pounds * UserProfile.kgPerPound,
             goal: goal, experience: experience,
             daysPerWeek: min(max(daysPerWeek, UserProfile.daysRange.lowerBound), UserProfile.daysRange.upperBound),
-            injuries: injuries, equipment: equipment, diet: diet
+            injuries: injuries, equipment: equipment, diet: diet, petName: tidyPetName
         )
     }
 
@@ -283,6 +294,13 @@ struct ProfileDraft: Equatable {
         guard let inches = blank ? 0 : FoodItem.parseAmount(heightInches), (0..<12).contains(inches) else { return nil }
         let total = Double(feet) * 12 + inches
         return Self.heightInchesRange.contains(total) ? total : nil
+    }
+
+    /// Trimmed and cut to length; "Biscuit" when nothing was typed.
+    private var tidyPetName: String {
+        let name = String(petName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(UserProfile.maxPetNameLength))
+            .trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? UserProfile.defaultPetName : name
     }
 
     var hasAllEquipment: Bool { equipment.count == UserProfile.Equipment.allCases.count }

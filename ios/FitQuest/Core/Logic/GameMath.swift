@@ -27,4 +27,16 @@ struct GameState: Equatable {
     }
 
     static func xpRequired(forLevel level: Int) -> Int { 50 * level * level }
+
+    /// Days in a row with something logged, ending today. Today is not over, so a streak that ran
+    /// through yesterday still counts until the day ends.
+    static func streak(activeDays: Set<Day>, today: Day) -> Int {
+        var day = activeDays.contains(today) ? today : today.adding(-1)
+        var count = 0
+        while activeDays.contains(day) {
+            count += 1
+            day = day.adding(-1)
+        }
+        return count
+    }
 }

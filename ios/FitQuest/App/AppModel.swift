@@ -88,7 +88,7 @@ final class AppModel {
     var logs: [Day: [Meal]]
     var templates = SampleData.templates
     var activeTemplateID = "push"
-    var xp = SampleData.startingXP
+    var xp = 0
     var gymID = "ram"
     /// Not persisted yet, like the rest of the state.
     var hidesProfileFromNonFriends = false
@@ -109,10 +109,15 @@ final class AppModel {
     /// The save of the most recently logged meal, so tests can wait for it.
     @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
     @ObservationIgnored private let biometricsStore: BiometricsStoring
+    @ObservationIgnored private let progressStore: ProgressStoring
 
     private var progressByExercise: [String: ExerciseProgress] = [:]
     private var rewardedTemplates: Set<String> = []
-    private var friendIDs = SampleData.initialFriendIDs
+    private var friendIDs: Set<String> = []
+    /// The top set of each exercise from the last workout that included it, by exercise id.
+    private var records: [String: String] = [:]
+    /// True for previews and tests that want the prototype's made-up history instead of a blank account.
+    private let usesSampleData: Bool
     private var requestedIDs: Set<String> = []
     private var sessions: [WorkoutSession]
     private var calorieHistory: [Day: Bool]
@@ -122,7 +127,7 @@ final class AppModel {
         today: Day = Day(), page: Page = .dashboard,
         auth: AuthProviding = LocalAuthService(), profiles: ProfileStoring = LocalProfileStore(),
         mealStore: MealStoring = LocalMealStore(), biometricsStore: BiometricsStoring = LocalBiometricsStore(),
-        sampleMeals: Bool = false
+        progressStore: ProgressStoring = LocalProgressStore(), sampleData: Bool = false
     ) {
         self.today = today
         self.page = page
@@ -130,11 +135,18 @@ final class AppModel {
         self.profiles = profiles
         self.mealStore = mealStore
         self.biometricsStore = biometricsStore
+        self.progressStore = progressStore
+        usesSampleData = sampleData
         account = auth.currentAccount
-        // A real account starts with an empty food log. The sample one is for previews and tests.
-        logs = sampleMeals ? SampleData.logs(today: today) : [:]
-        sessions = SampleData.sessions(today: today)
-        calorieHistory = sampleMeals ? SampleData.calorieHistory(today: today) : [:]
+        // A real account starts from nothing: no meals, XP, workouts or friends.
+        // The prototype's sample history is for previews and tests.
+        logs = sampleData ? SampleData.logs(today: today) : [:]
+        sessions = sampleData ? SampleData.sessions(today: today) : []
+        calorieHistory = sampleData ? SampleData.calorieHistory(today: today) : [:]
+        if sampleData {
+            xp = SampleData.startingXP
+            friendIDs = SampleData.initialFriendIDs
+        }
     }
 
     /// True while no Gemini key is configured and meal estimates are the canned sample foods.
@@ -161,6 +173,7 @@ final class AppModel {
         do {
             profile = try await profiles.profile(for: account.id)
             logs = await savedMeals(for: account)
+            await loadProgress(for: account)
             profileLoaded = true
             restoreFailed = false
         } catch {
@@ -172,6 +185,7 @@ final class AppModel {
     func signUp(name: String, email: String, password: String) async throws {
         let account = try await auth.signUp(name: name, email: email, password: password)
         logs = await savedMeals(for: account)
+        await loadProgress(for: account)
         start(account, profile: nil)
     }
 
@@ -180,6 +194,7 @@ final class AppModel {
         let account = try await auth.signIn(email: email, password: password)
         let profile = try await profiles.profile(for: account.id)
         logs = await savedMeals(for: account)
+        await loadProgress(for: account)
         start(account, profile: profile)
     }
 
@@ -198,9 +213,12 @@ final class AppModel {
         biometrics = nil
         profileLoaded = false
         restoreFailed = false
-        // The next person to sign in gets their own saved meals, not these.
+        // The next person to sign in gets their own saved meals and progress, not these.
         logs = [:]
         calorieHistory = [:]
+        apply(SavedProgress())
+        progressByExercise = [:]
+        rewardedTemplates = []
         recommendations = .idle
         answeredRequest = nil
         overlays.removeAll()
@@ -210,6 +228,29 @@ final class AppModel {
     /// The account's saved meals. A store that cannot be read gives an empty log, not a failed sign-in.
     private func savedMeals(for account: Account) async -> [Day: [Meal]] {
         (try? await mealStore.meals(for: account.id)) ?? [:]
+    }
+
+    /// The account's saved XP, workouts and friends. A store that cannot be read starts them empty.
+    private func loadProgress(for account: Account) async {
+        apply((try? await progressStore.progress(for: account.id)) ?? SavedProgress())
+    }
+
+    private func apply(_ progress: SavedProgress) {
+        xp = progress.xp
+        sessions = progress.sessions
+        records = progress.records
+        friendIDs = progress.friendIDs
+        requestedIDs = progress.requestedIDs
+    }
+
+    /// Saves XP, workouts and friends in the background, after any save already waiting.
+    private func saveProgress() {
+        guard let account else { return }
+        let progress = SavedProgress(xp: xp, sessions: sessions, records: records, friendIDs: friendIDs, requestedIDs: requestedIDs)
+        pendingSave = Task { [progressStore, previous = pendingSave] in
+            await previous?.value
+            try? await progressStore.save(progress, for: account.id)
+        }
     }
 
     private func start(_ account: Account, profile: UserProfile?) {
@@ -259,8 +300,22 @@ final class AppModel {
     var loggedDays: [Day] { logs.keys.sorted(by: >) }
     var calorieGoalMet: Bool { Nutrition.calorieGoalMet(consumed: consumed.kcal, target: targets.kcal) }
     var mood: Mood { Nutrition.mood(consumedKcal: consumed.kcal, targetKcal: targets.kcal, workoutDone: workoutDone) }
-    var game: GameState { GameState(xp: xp, streakDays: SampleData.streakDays) }
-    var points: Int { SampleData.startingPoints + max(0, xp - SampleData.startingXP) / 2 }
+    var game: GameState { GameState(xp: xp, streakDays: streakDays) }
+    /// Half a point for every XP earned.
+    var points: Int { usesSampleData ? SampleData.startingPoints + max(0, xp - SampleData.startingXP) / 2 : xp / 2 }
+    var petName: String { profile?.petName ?? UserProfile.defaultPetName }
+
+    /// Days in a row with a meal logged or a workout finished.
+    private var streakDays: Int {
+        if usesSampleData { return SampleData.streakDays }
+        let active = Set(logs.filter { !$0.value.isEmpty }.keys).union(sessions.map(\.day))
+        return GameState.streak(activeDays: active, today: today)
+    }
+
+    /// The best set from the last time this exercise was done, or a dash before the first time.
+    func lastRecord(for exercise: Exercise) -> String {
+        usesSampleData ? exercise.lastRecord : records[exercise.id] ?? "–"
+    }
     var gym: Gym { SampleData.gyms.first { $0.id == gymID } ?? SampleData.gyms[0] }
 
     var activeTemplate: WorkoutTemplate? {
@@ -321,6 +376,7 @@ final class AppModel {
             friendIDs.insert(member.id)
             flash("\(member.firstName) is now your friend")
         }
+        saveProgress()
     }
 
     /// A song's listeners with friends first. Private non-friends are counted, not named.
@@ -436,6 +492,7 @@ final class AppModel {
             }
         }
         xp += XPEvent.mealLogged.xp
+        saveProgress()
         overlays.removeAll()
         page = .dashboard
         flash("+\(total.kcal) kcal logged · +\(XPEvent.mealLogged.xp) XP")
@@ -529,6 +586,10 @@ final class AppModel {
         guard let template = activeTemplate, rewardedTemplates.insert(template.id).inserted else { return }
         xp += XPEvent.workoutCompleted.xp
         sessions.append(session(for: template))
+        for exercise in template.exercises {
+            if let top = topSet(of: exercise) { records[exercise.id] = "\(top.lbs) × \(top.reps)" }
+        }
+        saveProgress()
         flash("Workout complete · +\(XPEvent.workoutCompleted.xp) XP")
     }
 
@@ -552,11 +613,16 @@ final class AppModel {
         return formatter
     }()
 
+    /// The heaviest completed set of an exercise in the current workout, if any set was ticked.
+    private func topSet(of exercise: Exercise) -> SetEntry? {
+        progress(for: exercise).sets.filter(\.done).max { (Double($0.lbs) ?? 0) < (Double($1.lbs) ?? 0) }
+    }
+
     private func session(for template: WorkoutTemplate) -> WorkoutSession {
         let logged = template.exercises.map { (exercise: $0, sets: progress(for: $0).sets.filter(\.done)) }
         // Headline lift: the heaviest completed set of the first exercise that has one.
         let top = logged.first { !$0.sets.isEmpty }.flatMap { entry in
-            entry.sets.max { (Double($0.lbs) ?? 0) < (Double($1.lbs) ?? 0) }.map { "\(entry.exercise.name) \($0.lbs) × \($0.reps)" }
+            topSet(of: entry.exercise).map { "\(entry.exercise.name) \($0.lbs) × \($0.reps)" }
         }
         return WorkoutSession(
             id: UUID().uuidString, templateID: template.id, day: today, minutes: nil,

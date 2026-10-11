@@ -14,7 +14,7 @@ final class RenderTests: XCTestCase {
         let out = URL(fileURLWithPath: dir, isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
 
-        let model = AppModel(today: Day(key: "2026-10-10"), sampleMeals: true)
+        let model = AppModel(today: Day(key: "2026-10-10"), sampleData: true)
         let meal = try XCTUnwrap(model.logs[model.today]?[1])
         let friend = SampleData.members[1]
         let song = try XCTUnwrap(SampleData.songs["ram"]?.first)
@@ -49,6 +49,8 @@ final class RenderTests: XCTestCase {
             ("21-onboarding-goal", AnyView(OnboardingFlow(step: .goal, draft: draft))),
             ("22-onboarding-training", AnyView(OnboardingFlow(step: .training, draft: draft))),
             ("26-onboarding-diet", AnyView(OnboardingFlow(step: .diet, draft: draft))),
+            ("27-onboarding-pet", AnyView(OnboardingFlow(step: .pet, draft: draft))),
+            ("28-onboarding-scan", AnyView(OnboardingFlow(step: .scan, draft: draft))),
             ("23-onboarding-targets", AnyView(OnboardingFlow(step: .targets, draft: draft))),
             ("24-launch", AnyView(LaunchScreen().frame(height: 400))),
             ("27-background", AnyView(Color.clear.frame(height: 874))),

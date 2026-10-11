@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// About you → goal → training → diet → targets. Runs once after sign-up, and again from the profile
+/// About you → goal → training → diet → pet → targets → optional body scan. Runs once after sign-up, and again from the profile
 /// sheet (`editing`) to change the answers.
 struct OnboardingFlow: View {
-    enum Step: Int, CaseIterable { case body, goal, training, diet, targets }
-    private enum Field { case age, weight, feet, inches }
+    /// `scan` comes after the profile is worked out, and only for a new account.
+    enum Step: Int, CaseIterable { case body, goal, training, diet, pet, targets, scan }
+    private enum Field { case age, weight, feet, inches, petName }
 
     @Environment(AppModel.self) private var model
 
@@ -29,6 +30,8 @@ struct OnboardingFlow: View {
             case .goal: goalStep
             case .training: trainingStep
             case .diet: dietStep
+            case .pet: petStep
+            case .scan: scanStep
             case .targets: targetsStep
             }
         }
@@ -49,6 +52,7 @@ struct OnboardingFlow: View {
 
     private var title: String {
         if step == .targets { return "Your targets" }
+        if step == .scan { return "Body scan" }
         return "\(editing ? "Edit profile" : "Set up") · \(step.rawValue + 1) of \(Step.targets.rawValue)"
     }
 
@@ -175,9 +179,68 @@ struct OnboardingFlow: View {
                     }
                 }
             }
-            footer("See my targets") { advance(unless: draft.profile == nil ? "Go back and finish the earlier steps." : nil) }
+            footer("Continue") { advance(unless: nil) }
         }
         .aeroCard()
+    }
+
+    private var petStep: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            intro(editing ? "Your pet" : "Meet your pet", "It gets happier and levels up as you log meals and train. What will you call it?")
+            DogYard(height: 150) {
+                DogView(walking: false).scaleEffect(1.4, anchor: .bottom)
+            }
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                FQField(label: "Pet’s name", focused: focus == .petName) {
+                    TextField("", text: $draft.petName, prompt: prompt(UserProfile.defaultPetName))
+                        .nameEntry()
+                        .submitLabel(.done)
+                        .focused($focus, equals: .petName)
+                        .onSubmit { focus = nil }
+                }
+                Text("Leave blank to keep \(UserProfile.defaultPetName). You can rename it later from your profile.")
+                    .caption()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            footer("See my targets") {
+                focus = nil
+                advance(unless: draft.profile == nil ? "Go back and finish the earlier steps." : nil)
+            }
+        }
+        .aeroCard()
+    }
+
+    /// Offered once, right after the targets. Either button saves the profile and opens the app.
+    @ViewBuilder
+    private var scanStep: some View {
+        if let profile = draft.profile {
+            VStack(alignment: .leading, spacing: 16) {
+                intro("Scan your body", "Optional. One full-body photo gives estimates of your neck, chest, waist and hips, and a body-fat estimate.")
+                Label("The photo is sent to the scan server once and never kept. Only the numbers are saved.", systemImage: "lock.fill")
+                    .font(Theme.caption(13))
+                    .foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("You can also do this later from your profile.").caption()
+                if let problem {
+                    Label(problem, systemImage: "exclamationmark.circle.fill")
+                        .font(Theme.caption(14))
+                        .foregroundStyle(Theme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if model.bodyScanner == nil {
+                    Text("Scanning isn’t set up in this build, so this step is skipped.")
+                        .copy(14, color: Theme.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                    FQButton(title: saving ? "Saving…" : "Start FitMax", wide: true) { save(profile) }
+                } else {
+                    FQButton(title: saving ? "Saving…" : "Scan now", wide: true) { save(profile, thenScan: true) }
+                    FQButton(title: "Skip for now", variant: .secondary, wide: true) { save(profile) }
+                }
+            }
+            .disabled(saving)
+            .aeroCard()
+        }
     }
 
     @ViewBuilder
@@ -201,8 +264,12 @@ struct OnboardingFlow: View {
                 Text("You burn about \(String(maintenance)) kcal a day, going by your age, height, weight and \(profile.daysPerWeek) training \(profile.daysPerWeek == 1 ? "day" : "days") a week (Mifflin-St Jeor formula). Your goal, \(profile.goal.label.lowercased()), sets the target from there.")
                     .copy(14)
                 Text("These are estimates, not medical advice.").caption()
-                footer(saving ? "Saving…" : editing ? "Save" : "Start FitQuest") { save(profile) }
-                    .disabled(saving)
+                if editing {
+                    footer(saving ? "Saving…" : "Save") { save(profile) }
+                        .disabled(saving)
+                } else {
+                    footer("Continue") { advance(unless: nil) }
+                }
             }
             .aeroCard()
         }
@@ -213,7 +280,7 @@ struct OnboardingFlow: View {
     private func intro(_ title: String, _ detail: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).heading(22).accessibilityAddTraits(.isHeader)
-            Text(detail).copy(15)
+            Text(detail).copy(15).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -273,7 +340,8 @@ struct OnboardingFlow: View {
         }
     }
 
-    private func save(_ profile: UserProfile) {
+    /// Saves the profile. `thenScan` opens the body scan on top of the app as it appears.
+    private func save(_ profile: UserProfile, thenScan: Bool = false) {
         guard !saving else { return }
         problem = nil
         saving = true
@@ -283,6 +351,8 @@ struct OnboardingFlow: View {
                 if editing {
                     model.dismiss()
                     model.flash("Profile saved · targets updated")
+                } else if thenScan {
+                    model.present(.bodyScan)
                 }
             } catch {
                 problem = "Couldn’t save your profile. Check your connection and try again."

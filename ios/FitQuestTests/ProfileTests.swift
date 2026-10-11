@@ -172,6 +172,31 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(profile.equipment, [.bands])
     }
 
+    // MARK: Pet name
+
+    func testPetNameIsTidiedAndFallsBackToBiscuit() throws {
+        var draft = completeDraft()
+        XCTAssertEqual(try XCTUnwrap(draft.profile).petName, "Biscuit", "Left blank")
+        draft.petName = "  Rex  "
+        XCTAssertEqual(try XCTUnwrap(draft.profile).petName, "Rex")
+        draft.petName = "Sir Barksalot the Magnificent Third"
+        XCTAssertEqual(try XCTUnwrap(draft.profile).petName, "Sir Barksalot the Ma", "Cut to fit its card")
+        XCTAssertEqual(ProfileDraft(try XCTUnwrap(draft.profile)).petName, "Sir Barksalot the Ma")
+    }
+
+    func testPetNameIsStoredWithTheProfile() throws {
+        var draft = completeDraft()
+        draft.petName = "Rex"
+        let profile = try XCTUnwrap(draft.profile)
+        let data = try JSONEncoder().encode(profile)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["pet_name"] as? String, "Rex")
+        XCTAssertEqual(try JSONDecoder().decode(UserProfile.self, from: data).petName, "Rex")
+
+        let old = #"{"sex":"female","age":30,"height_cm":165,"weight_kg":60,"goal":"cut","experience":"beginner","days_per_week":3,"injuries":[],"equipment":[]}"#
+        XCTAssertEqual(try JSONDecoder().decode(UserProfile.self, from: Data(old.utf8)).petName, "Biscuit", "Saved before pets had names")
+    }
+
     // MARK: Summaries
 
     func testSummariesReadNaturally() throws {

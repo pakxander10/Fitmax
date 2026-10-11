@@ -1,6 +1,6 @@
 # Fitmax
 
-FitQuest — an iPhone fitness app for HackNC: meal logging, workout logging, and a game layer on top.
+FitMax — an iPhone fitness app (the code and Xcode project still use the working name FitQuest) for HackNC: meal logging, workout logging, and a game layer on top.
 
 ## iOS app (`ios/`)
 

@@ -25,6 +25,9 @@ struct GymPage: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 CardTitle(title: "Your friends", trailing: "\(model.friendsHere(at: model.gymID)) here now")
+                if friends.isEmpty {
+                    Text("No friends at this gym yet. Tap Add friend to find people who train here.").copy(15)
+                }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 4), spacing: 16) {
                     ForEach(friends) { friend in
                         VStack(spacing: 6) {

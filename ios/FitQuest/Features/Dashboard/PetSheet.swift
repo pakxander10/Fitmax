@@ -4,23 +4,27 @@ struct PetSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Nothing is owned to begin with; buying is not built yet.
     private static let shop: [(name: String, kind: String, cost: Int, owned: Bool)] = [
-        ("Molsheim garage", "Background", 200, true),
+        ("Molsheim garage", "Background", 200, false),
         ("Night track", "Background", 350, false),
-        ("Racing collar", "Accessory", 120, true),
+        ("Racing collar", "Accessory", 120, false),
         ("Carbon kennel", "Interior", 600, false),
     ]
 
-    private static let achievements: [(name: String, earned: Bool)] = [
-        ("First scan", true),
-        ("7-day streak", false),
-        ("100 meals logged", false),
-        ("Visit a friend’s pet", true),
-    ]
+    /// Earned from what the person has really done.
+    private var achievements: [(name: String, earned: Bool)] {
+        [
+            ("First scan", model.biometrics != nil),
+            ("7-day streak", model.game.streakDays >= 7),
+            ("100 meals logged", model.logs.values.reduce(0) { $0 + $1.count } >= 100),
+            ("First friend added", SampleData.gyms.contains { !model.friends(at: $0.id).isEmpty }),
+        ]
+    }
 
     var body: some View {
         let game = model.game
-        FQOverlay(title: "Biscuit", onBack: model.dismiss) {
+        FQOverlay(title: model.petName, onBack: model.dismiss) {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 12) {
                     DogYard(height: 190) {
@@ -43,7 +47,7 @@ struct PetSheet: View {
                         }
                         FQProgressLine(fraction: game.progress)
                     }
-                    Text("Biscuit is happy when you hit your goals and levels up as you earn XP. Earn points at the gym and by following your plan.")
+                    Text("\(model.petName) is happy when you hit your goals and levels up as you earn XP. Earn points at the gym and by following your plan.")
                         .copy(14)
                 }
                 .aeroCard()
@@ -65,8 +69,8 @@ struct PetSheet: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     CardTitle(title: "Achievements").padding(.vertical, 12)
-                    ForEach(Self.achievements, id: \.name) { item in
-                        FQRow(divider: item.name != Self.achievements.last?.name) {
+                    ForEach(achievements, id: \.name) { item in
+                        FQRow(divider: item.name != achievements.last?.name) {
                             FQCheck(on: item.earned, size: 20)
                             Text(item.name).copy(color: item.earned ? Theme.ink : Theme.muted)
                         }

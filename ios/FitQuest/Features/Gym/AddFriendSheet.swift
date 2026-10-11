@@ -40,7 +40,7 @@ struct AddFriendSheet: View {
                     .frame(height: 44)
                     .background(Capsule().fill(.white))
                     .overlay(Capsule().strokeBorder(Theme.aqua.opacity(0.6), lineWidth: 1))
-                    Text("Shows members who use FitQuest and train at this gym. Switch gyms on the previous page to look elsewhere.")
+                    Text("Shows members who use FitMax and train at this gym. Switch gyms on the previous page to look elsewhere.")
                         .caption()
                 }
                 .aeroCard()
