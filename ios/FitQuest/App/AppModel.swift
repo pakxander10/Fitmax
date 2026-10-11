@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// App state for the whole UI. The account and profile come from `auth` and `profiles`;
-/// everything else is still seeded from `SampleData` and kept in memory.
+/// App state for the whole UI. The account, profile and logged meals come from `auth`, `profiles`
+/// and `mealStore`; everything else is still seeded from `SampleData` and kept in memory.
 @Observable
 final class AppModel {
     enum Page: Int, CaseIterable, Identifiable {
@@ -100,6 +100,9 @@ final class AppModel {
     @ObservationIgnored var now: () -> Date = { Date() }
     @ObservationIgnored private let auth: AuthProviding
     @ObservationIgnored private let profiles: ProfileStoring
+    @ObservationIgnored private let mealStore: MealStoring
+    /// The save of the most recently logged meal, so tests can wait for it.
+    @ObservationIgnored private(set) var pendingSave: Task<Void, Never>?
 
     private var progressByExercise: [String: ExerciseProgress] = [:]
     private var rewardedTemplates: Set<String> = []
@@ -112,12 +115,13 @@ final class AppModel {
     init(
         today: Day = Day(), page: Page = .dashboard,
         auth: AuthProviding = LocalAuthService(), profiles: ProfileStoring = LocalProfileStore(),
-        sampleMeals: Bool = false
+        mealStore: MealStoring = LocalMealStore(), sampleMeals: Bool = false
     ) {
         self.today = today
         self.page = page
         self.auth = auth
         self.profiles = profiles
+        self.mealStore = mealStore
         account = auth.currentAccount
         // A real account starts with an empty food log. The sample one is for previews and tests.
         logs = sampleMeals ? SampleData.logs(today: today) : [:]
@@ -148,6 +152,7 @@ final class AppModel {
         guard let account, !profileLoaded else { return }
         do {
             profile = try await profiles.profile(for: account.id)
+            logs = await savedMeals(for: account)
             profileLoaded = true
             restoreFailed = false
         } catch {
@@ -158,13 +163,16 @@ final class AppModel {
     @MainActor
     func signUp(name: String, email: String, password: String) async throws {
         let account = try await auth.signUp(name: name, email: email, password: password)
+        logs = await savedMeals(for: account)
         start(account, profile: nil)
     }
 
     @MainActor
     func signIn(email: String, password: String) async throws {
         let account = try await auth.signIn(email: email, password: password)
-        start(account, profile: try await profiles.profile(for: account.id))
+        let profile = try await profiles.profile(for: account.id)
+        logs = await savedMeals(for: account)
+        start(account, profile: profile)
     }
 
     /// Saves the onboarding answers and opens the app.
@@ -181,13 +189,18 @@ final class AppModel {
         profile = nil
         profileLoaded = false
         restoreFailed = false
-        // Meals are not saved per account yet, so they must not carry over to whoever signs in next.
+        // The next person to sign in gets their own saved meals, not these.
         logs = [:]
         calorieHistory = [:]
         recommendations = .idle
         answeredRequest = nil
         overlays.removeAll()
         page = .dashboard
+    }
+
+    /// The account's saved meals. A store that cannot be read gives an empty log, not a failed sign-in.
+    private func savedMeals(for account: Account) async -> [Day: [Meal]] {
+        (try? await mealStore.meals(for: account.id)) ?? [:]
     }
 
     private func start(_ account: Account, profile: UserProfile?) {
@@ -222,7 +235,10 @@ final class AppModel {
     func status(for day: Day) -> DayStatus {
         if day == today { return DayStatus(calories: calorieGoalMet, workout: workoutDone) }
         if day > today { return DayStatus() }
-        return DayStatus(calories: calorieHistory[day] ?? false, workout: sessions.contains { $0.day == day })
+        // A past day is judged on the meals logged for it, unless the sample history has its own answer.
+        let ate = (logs[day] ?? []).map(\.macros).total.kcal
+        let onTarget = calorieHistory[day] ?? (ate > 0 && Nutrition.calorieGoalMet(consumed: ate, target: targets.kcal))
+        return DayStatus(calories: onTarget, workout: sessions.contains { $0.day == day })
     }
 
     /// Finished workouts of one template, newest first.
@@ -370,6 +386,13 @@ final class AppModel {
             name: items.map(\.name).joined(separator: ", "), macros: total, source: source
         )
         logs[today, default: []].append(meal)
+        if let account {
+            // Saved in the background, one after another so they land in the order they were logged.
+            pendingSave = Task { [mealStore, today, previous = pendingSave] in
+                await previous?.value
+                try? await mealStore.save(meal, on: today, for: account.id)
+            }
+        }
         xp += XPEvent.mealLogged.xp
         overlays.removeAll()
         page = .dashboard

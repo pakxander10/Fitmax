@@ -8,10 +8,10 @@ struct RootView: View {
 
     private static let pageKey = "fq-page"
 
-    /// `foodAnalyzer` replaces the model's default when the app has a better one (Firebase).
-    init(foodAnalyzer: FoodAnalyzing? = nil) {
+    /// `foodAnalyzer` and `mealStore` replace the model's defaults when the app has better ones (Firebase).
+    init(foodAnalyzer: FoodAnalyzing? = nil, mealStore: MealStoring? = nil) {
         let stored = UserDefaults.standard.object(forKey: Self.pageKey) as? Int
-        let model = AppModel(page: stored.flatMap(AppModel.Page.init) ?? .dashboard)
+        let model = AppModel(page: stored.flatMap(AppModel.Page.init) ?? .dashboard, mealStore: mealStore ?? LocalMealStore())
         if let foodAnalyzer { model.foodAnalyzer = foodAnalyzer }
         _model = State(initialValue: model)
     }

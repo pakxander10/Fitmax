@@ -17,7 +17,7 @@ enum MealSlot: String, CaseIterable, Identifiable {
     }
 }
 
-enum MealSource: Equatable {
+enum MealSource: String, Equatable {
     case photo, text
 }
 

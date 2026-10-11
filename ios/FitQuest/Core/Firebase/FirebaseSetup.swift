@@ -27,7 +27,9 @@ enum FirebaseSetup {
         do {
             _ = try await Auth.auth().signInAnonymously()
         } catch {
-            log.error("Anonymous sign-in failed: \(error.localizedDescription, privacy: .public)")
+            // The description alone only says "internal error"; the server's own reason is in the underlying error.
+            let reason = ((error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError)?.userInfo["FIRAuthErrorUserInfoDeserializedResponseKey"]
+            log.error("Anonymous sign-in failed: \(error.localizedDescription, privacy: .public) \(String(describing: reason), privacy: .public)")
         }
     }
 

@@ -20,11 +20,12 @@ final class SessionTests: XCTestCase {
         defaults.removePersistentDomain(forName: suite)
     }
 
-    private func makeModel(profiles: ProfileStoring? = nil) -> AppModel {
+    private func makeModel(profiles: ProfileStoring? = nil, today: String = "2026-10-10") -> AppModel {
         AppModel(
-            today: Day(key: "2026-10-10"),
+            today: Day(key: today),
             auth: LocalAuthService(defaults: defaults),
-            profiles: profiles ?? LocalProfileStore(defaults: defaults)
+            profiles: profiles ?? LocalProfileStore(defaults: defaults),
+            mealStore: LocalMealStore(defaults: defaults)
         )
     }
 
@@ -85,6 +86,56 @@ final class SessionTests: XCTestCase {
         try await model.signUp(name: "Sam", email: "sam@example.com", password: "secret1")
 
         XCTAssertTrue(model.logs.isEmpty)
+    }
+
+    // MARK: Meals are kept
+
+    func testLoggedMealsSurviveARelaunch() async throws {
+        let first = makeModel()
+        try await first.signUp(name: "Alex", email: "alex@example.com", password: "secret1")
+        try await first.completeOnboarding(profile)
+        first.saveMeal(slot: .dinner, items: SampleData.photoEstimate, source: .photo)
+        await first.pendingSave?.value
+
+        let relaunched = makeModel()
+        await relaunched.restoreSession()
+
+        XCTAssertEqual(relaunched.logs, first.logs)
+        XCTAssertEqual(relaunched.consumed.kcal, 500)
+        XCTAssertEqual(relaunched.remainingKcal, 2_950 - 500)
+    }
+
+    func testMealsComeBackAfterSigningOutAndIn() async throws {
+        let model = makeModel()
+        try await model.signUp(name: "Alex", email: "alex@example.com", password: "secret1")
+        try await model.completeOnboarding(profile)
+        model.saveMeal(slot: .dinner, items: SampleData.photoEstimate, source: .photo)
+        await model.pendingSave?.value
+        let logged = model.logs
+        model.signOut()
+        XCTAssertTrue(model.logs.isEmpty)
+
+        try await model.signIn(email: "alex@example.com", password: "secret1")
+
+        XCTAssertEqual(model.logs, logged)
+    }
+
+    func testYesterdaysMealsStayOnYesterdayAndTickTheWeekStrip() async throws {
+        let first = makeModel(today: "2026-10-09")
+        try await first.signUp(name: "Alex", email: "alex@example.com", password: "secret1")
+        try await first.completeOnboarding(profile)
+        // 2,950 kcal target, so 2,900 is on target and ticks the day.
+        let big = FoodItem(name: "Big day", grams: 100, base: Macros(kcal: 2_900, protein: 0, carbs: 0, fat: 0), confidence: .low)
+        first.saveMeal(slot: .dinner, items: [big], source: .text)
+        await first.pendingSave?.value
+
+        let nextDay = makeModel(today: "2026-10-10")
+        await nextDay.restoreSession()
+
+        XCTAssertEqual(nextDay.consumed.kcal, 0, "Today starts empty")
+        XCTAssertEqual(nextDay.loggedDays, [Day(key: "2026-10-09")])
+        XCTAssertTrue(nextDay.status(for: Day(key: "2026-10-09")).calories)
+        XCTAssertFalse(nextDay.status(for: Day(key: "2026-10-08")).calories)
     }
 
     func testOnboardingCannotFinishWhileSignedOut() async {
